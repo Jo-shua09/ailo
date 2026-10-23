@@ -176,8 +176,9 @@ Amounts are integer kobo (`850000` = ₦8,500.00). Field names are final unless 
 
 Endpoints (from the PRD): `GET /v1/payments`, `GET /v1/payments/:id` (with the receipt),
 `POST /v1/approvals/:id` (`{ "decision": "approve" | "deny" }`), `POST /v1/mandates` (compile/test/save),
-`POST /v1/mandates/:id/brake`, `POST /v1/ops/reconcile`. Realtime updates come via Supabase Realtime on
-the `payments` and `approvals` tables.
+`POST /v1/mandates/:id/brake`, `POST /v1/ops/reconcile`. Live updates come from
+`GET /v1/events`, a Server-Sent Events stream (`EventSource` in the browser) sending `payment.updated` and
+`approval.created` events with the same JSON shapes as above.
 
 ## Priority if time runs short
 

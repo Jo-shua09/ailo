@@ -4,7 +4,7 @@ Ailo (pronounced "EYE-low": AI + allowance) is the operating system for agent mo
 
 **Give your AI an allowance, not your bank login.**
 
-Version 3 -- 23 Oct 2026 -- PAU 24-Hour Hackathon (build window Fri 2:00 PM to Sat 2:00 PM).
+Version 3.1 -- 23 Oct 2026 (stack, team and Kora corrections added 9:30 PM) -- PAU 24-Hour Hackathon (build window Fri 2:00 PM to Sat 2:00 PM).
 Targets: AGENTS + TRUST + MONEY. Ecosystem name: **Ailo**. Feature names are working names.
 
 **Source rule:** every architecture choice below copies a documented production pattern, cited inline
@@ -92,7 +92,9 @@ labelled "sandbox only". The claim that only MMOs, not PSSPs, may hold customer 
 **Splitting payments.** The approval threshold applies to a rolling 24h total per payee, plus per-payee rate
 limits (Stripe interval-based limits, P1).
 
-**5.3 Rule compilation (Spec Gate).** The LLM outputs a json-rules-engine rule, validated by Zod. The owner
+**5.3 Rule compilation (Spec Gate).** The LLM outputs a `SpendPolicy` (`packages/core`), shaped like Stripe
+Issuing `spending_controls` (P1): allowed categories, allowed payees, `spending_limits[{amount_kobo, interval}]`,
+Nod thresholds and an expiry. It is validated by zod and evaluated by plain code (no rules engine). The owner
 sees the English and the compiled rule side by side, clicks **Test** (replays the last N demo payments and
 shows which would be blocked), then **Save**. Only saved rules are enforced (Radar Assistant, P2).
 
@@ -103,7 +105,8 @@ retryable "in progress" error on a concurrent duplicate (Stripe, Adyen, P3). Tow
 timeout or 5xx, reuses the same reference. On "Duplicate Transaction Reference" or a 5xx, **query by
 reference, never re-send with a new reference** (Kora docs, P3). A new reference (`AL-{payment_id}-r{n}`)
 is allowed only after a query confirms a **final** failure on the previous one, so a timeout can never
-produce a second payout.
+produce a second payout. Kora `metadata` allows at most 5 keys with **no underscores** in key names
+(e.g. `paymentid`, not `payment_id`). Kora returns amounts as strings: convert with `nairaToKobo`.
 
 **5.5 Payout lifecycle.** States: `requested -> blocked | held -> pending_approval -> approved ->
 submitting -> submitted -> settled | failed | unknown -> (reconciled) | reversed | expired | cancelled |
@@ -113,7 +116,8 @@ when Kora's amount, currency and reference match ours; otherwise `needs_review` 
 **5.6 Webhooks.** Verify `x-korapay-signature` (HMAC-SHA256 of `data` with the secret key) on the raw
 body. Insert `(event, data.reference)` under a UNIQUE constraint (Kora sends no event id). Return 2xx,
 process async, never rely on order, and treat the webhook as a hint that triggers a re-query (Stripe webhook
-best practice; Kora webhook docs, P4).
+best practice; Kora webhook docs, P4). Every payout sends its own `notification_url` built from
+`PUBLIC_BASE_URL`, so local (ngrok static domain) and deployed environments each receive their own webhooks.
 
 **5.7 Ledger.** Double-entry in kobo. Accounts: `partner_cash`, `owner_wallet`, `holds`, `escrow`,
 `payee_payable`, `fees`. Holds and escrow are pending transfers with an expiry, posted or voided exactly
@@ -196,6 +200,7 @@ Live vs mocked is shown on screen. A backup video is recorded by 11 AM Saturday.
 | POST | /v1/webhooks/kora | Kora | Signed, deduped, async |
 | POST | /v1/ops/reconcile | operator | Square Up |
 | GET | /.well-known/jwks.json | payees | Badge verification |
+| GET | /v1/events | owner console | Server-Sent Events: `payment.updated`, `approval.created` |
 
 MCP tools: `get_mandate`, `pay`, `payment_status`. Till middleware: `till({ price_kobo })`.
 
@@ -247,12 +252,29 @@ plain-English rule before money moves. It is the Naira and Know-Your-Agent layer
 
 ## 14. Workstreams
 
-| Owner | Workstream |
-|-------|------------|
-| A | Rails: payments API, check order, reserve/holds, ledger, idempotency, Kora adapter + re-query, Square Up |
-| B | Spec Gate + Second Look: compile, test, save, flags, the 2 s deadline, the eval harness |
-| C | Agents + Till: MCP server, goal-driven buyer agent, 402 middleware, demo shop + poisoned page, Badge signing |
-| D | Surfaces + pitch: owner dashboard, Nod phone page, Brake, Receipt view, ecosystem map, deck, backup video |
+| Owner | Workstream | Where |
+|-------|------------|-------|
+| **Emmanuel** (backend) | Rails: payments pipeline, reserve/holds, ledger, idempotency, Kora client + re-query, webhooks, Nod, Brake, Square Up, SSE events, Till | `apps/api` modules, `packages/till` |
+| **Adrien** (AI) | Spec Gate + Second Look (API modules), the buyer agent + MCP tools, the eval harness | `apps/api` `mandates` + `second-look`, `apps/agent` |
+| **Josh** (frontend) | Console: Live feed, Rules, Receipt drawer, Agents (Badge + Brake), Square Up, Ecosystem map | `apps/console` |
+| **Chidi** (frontend) | `/nod` phone page, demo shop + poisoned page | `apps/console` `/nod`, `apps/shop` |
 
-Milestones: contracts committed by 2:30 PM. One real Kora sandbox payment end to end by **7 PM**. All 5
-beats by 3 AM. Freeze at **12 PM** Saturday. Submit by 1:30 PM.
+Milestones (re-planned at 9:30 PM Friday after a late start): one real Kora sandbox payment end to end by
+**11 PM**. All 5 beats by **6 AM**. Eval, backup video and polish 6-11 AM. Freeze at **12 PM** Saturday. Submit by 1:30 PM.
+
+## 15. Stack and repository
+
+Chosen on merit and verified against npm/PyPI on 23 Oct 2026 (details: `pau/ailo-planning/research/`).
+
+| Layer | Choice |
+|-------|--------|
+| Repo | npm workspaces monorepo: `packages/core` (contracts, money, states), `packages/till`, `apps/api`, `apps/console`, `apps/shop`, `apps/agent` |
+| API | TypeScript, Express 5, feature modules (`*.routes/service/repository/dto/test`), zod 4 |
+| Database | Hosted Postgres, Drizzle ORM (`.for('update')` row locks) |
+| AI (API) | Vercel AI SDK, provider-agnostic: `LLM_PROVIDER=google\|openai\|anthropic`. Default Gemini: `gemini-3.5-flash-lite` (Second Look, `maxRetries: 0`, 1.8 s timeout), `gemini-3.8-flash` (Spec Gate) |
+| AI (agent) | Python, Pydantic AI (model string `provider:model`) + MCP tools |
+| Identity | jose, Ed25519 signed requests + JWKS |
+| Live updates | Server-Sent Events from the API (no Supabase Realtime) |
+| Frontend | Next.js 16, React Query, MSW 3, Zustand, Tailwind 4, shadcn/ui |
+| Payments | Kora sandbox over REST (no official SDK). Webhook tunnel: ngrok static domain |
+| Secrets | `.env` per app, gitignored; Kora secret only in `apps/api/.env` |
