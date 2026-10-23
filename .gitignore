@@ -8,3 +8,6 @@ dist/
 .DS_Store
 .vercel/
 .supabase/
+
+# Local AI assistant context (kept out of the public repo)
+CLAUDE.md
