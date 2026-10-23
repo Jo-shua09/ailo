@@ -17,7 +17,7 @@ const Env = z.object({
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  OWNER_PIN: z.string().min(4),
+  OWNER_PIN: z.string().min(6),
   SESSION_SECRET: z.string().min(16),
   CONSOLE_ORIGIN: z.url().default("http://localhost:3000"),
 });

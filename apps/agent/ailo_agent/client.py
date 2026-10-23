@@ -16,11 +16,11 @@ class AiloError(Exception):
 
 
 class AiloClient:
-    def __init__(self, base_url: str, agent_id: str, key: Ed25519PrivateKey, timeout: float = 10.0):
+    def __init__(self, base_url: str, agent_id: str, key: Ed25519PrivateKey, http: httpx.Client | None = None):
         self.base_url = base_url.rstrip("/")
         self.agent_id = agent_id
         self.key = key
-        self.http = httpx.Client(timeout=timeout)
+        self.http = http or httpx.Client(timeout=10.0)
 
     def get(self, path: str) -> dict:
         return self._send("GET", path, b"")
@@ -41,7 +41,10 @@ class AiloClient:
             **(extra or {}),
         }
         res = self.http.request(method, url, content=body or None, headers=headers)
-        data = res.json() if res.content else {}
+        try:
+            data = res.json() if res.content else {}
+        except ValueError:  # e.g. an HTML 502 page from ngrok or a proxy
+            data = {}
         if res.is_error:
             err = data.get("error", {})
             raise AiloError(res.status_code, err.get("code", "HTTP_ERROR"), err.get("message", res.text))
