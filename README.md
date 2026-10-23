@@ -29,7 +29,7 @@ ailo/
 |--------|----------------|-------|
 | `packages/core` | The single source of truth every app imports: kobo money helpers (no floats), the 16 payment states and which moves are legal, and the request/response shapes. Change a contract here and every app sees it | shared |
 | `packages/till` | What a merchant installs to accept agent payments: answers 402 with a price, verifies the signed paid retry | Emmanuel |
-| `apps/api` | The rails. Receives signed payment requests from agents, runs the checks, reserves funds, calls Kora, handles webhooks, streams live updates to the console. See `apps/api/src/modules/README.md` | Emmanuel (Adrien: AI modules) |
+| `apps/api` | The rails. Receives signed payment requests from agents, runs the checks, reserves funds, calls Kora, handles webhooks, streams live updates to the console. See `apps/api/src/modules/README.md` | Emmanuel (money). Adrien (everything agent + AI: `agents`, `mandates`, `second-look`, agent-signature middleware) |
 | `apps/console` | The owner's screens: Live feed, Rules (Spec Gate), Receipt, Agents (Badge + Brake), Square Up, Ecosystem, and `/nod` on the phone. See `docs/frontend-handoff.md` | Josh, Chidi (`/nod`) |
 | `apps/shop` | A normal-looking third-party store. Proves any site can accept agents through Till | Chidi |
 | `apps/agent` | The AI customer: given a goal and a budget, it shops and pays through Ailo. Also runs the eval (attacks + legitimate tasks) | Adrien |

@@ -15,7 +15,7 @@ through their exported service functions. File pattern per module:
 | Module | Feature name | What it does | Owner |
 |--------|--------------|--------------|-------|
 | `health` | -- | Liveness check | done |
-| `agents` | Badge, Brake | Register an agent, store its Ed25519 public key, publish JWKS, revoke on Brake | Emmanuel |
+| `agents` | Badge, Brake | Register an agent, store its Ed25519 public key, publish JWKS, revoke on Brake. Also the agent-signature middleware | Adrien |
 | `payments` | -- | The check pipeline: signature, rules, reserve, Second Look, Nod, payout. Owns the payment state machine | Emmanuel |
 | `ledger` | -- | Double-entry postings in kobo, holds/reserves with a balance condition, reversals only | Emmanuel |
 | `rails` | -- | Payout connector interface + `kora` client + labelled `simulated` client. Fixed reference per payment, re-query on 5xx/timeout | Emmanuel |
