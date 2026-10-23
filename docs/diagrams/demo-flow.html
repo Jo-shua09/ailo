@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ailo demo flow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-accent: #bf4520;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 3rem 2rem; }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem); font-weight: 400;
+      letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 1.5rem; }
+    svg { width: 100%; min-width: 980px; display: block; }
+    @media print { .diagram-container { overflow-x: visible; } svg { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Swimlane · Ailo · living doc, will change</p>
+    <h1>The demo flow: rule, buy, check, nod, pay, receipt</h1>
+    <div class="diagram-container">
+      <svg viewBox="0 0 980 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="demo-flow-title demo-flow-desc">
+        <title id="demo-flow-title">Ailo demo flow</title>
+        <desc id="demo-flow-desc">The owner sets an English rule that Ailo compiles into a policy; the agent shops, gets a 402 price from the shop, sends a signed payment request; Ailo checks it, asks the owner for a Nod when needed, pays out through Kora and writes a Receipt.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- Lane dividers -->
+        <line x1="40" y1="80" x2="960" y2="80" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+        <line x1="40" y1="168" x2="960" y2="168" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <line x1="40" y1="256" x2="960" y2="256" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <line x1="40" y1="344" x2="960" y2="344" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <line x1="40" y1="432" x2="960" y2="432" stroke="rgba(45,49,66,0.10)" stroke-width="1"/>
+        <line x1="40" y1="520" x2="960" y2="520" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+        <line x1="140" y1="80" x2="140" y2="520" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+
+        <!-- Lane labels -->
+        <text x="52" y="128" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">OWNER</text>
+        <text x="52" y="216" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">AGENT</text>
+        <text x="52" y="304" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">SHOP</text>
+        <text x="52" y="392" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">AILO</text>
+        <text x="52" y="480" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">KORA</text>
+
+        <!-- Arrows (drawn first) -->
+        <!-- Set rule -> Compile -->
+        <line x1="212" y1="148" x2="212" y2="364" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Compile -> Check (policy feeds every check) -->
+        <line x1="268" y1="388" x2="564" y2="388" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Shop for goal -> Quote price -->
+        <path d="M 404,212 H 476 Q 484,212 484,220 V 276" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Quote price -> Pay request -->
+        <path d="M 540,300 H 588 Q 596,300 596,292 V 236" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Pay request -> Check (focal handoff) -->
+        <line x1="644" y1="236" x2="644" y2="364" stroke="#bf4520" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <!-- Check -> Nod (only when needed) -->
+        <path d="M 676,380 H 748 Q 756,380 756,372 V 148" fill="none" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <!-- Nod -> Payout -->
+        <line x1="788" y1="148" x2="788" y2="452" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <!-- Check -> Payout (allowed) -->
+        <path d="M 620,412 V 468 Q 620,476 628,476 H 700" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Payout -> Receipt -->
+        <path d="M 812,476 H 884 Q 892,476 892,468 V 412" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Arrow labels -->
+        <rect x="220" y="244" width="56" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="248" y="254" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">COMPILE</text>
+        <rect x="380" y="368" width="64" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="412" y="378" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">POLICY V1</text>
+        <rect x="408" y="192" width="52" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="434" y="202" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">BROWSE</text>
+        <rect x="516" y="240" width="72" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="552" y="250" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">402 + PRICE</text>
+        <rect x="568" y="316" width="68" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="602" y="326" fill="#bf4520" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">SIGNED PAY</text>
+        <rect x="680" y="296" width="68" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="714" y="306" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">NEEDS NOD</text>
+        <rect x="796" y="200" width="64" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="828" y="210" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">APPROVED</text>
+        <rect x="552" y="440" width="60" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="582" y="450" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">ALLOWED</text>
+        <rect x="820" y="436" width="64" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="852" y="446" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">CONFIRMED</text>
+
+        <!-- Nodes -->
+        <rect x="156" y="100" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="212" y="122" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Set the rule</text>
+        <text x="212" y="136" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Spec Gate · English</text>
+
+        <rect x="156" y="364" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="212" y="386" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Compile policy</text>
+        <text x="212" y="400" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">test · save</text>
+
+        <rect x="292" y="188" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="348" y="210" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Shop for goal</text>
+        <text x="348" y="224" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">restock under ₦20k</text>
+
+        <rect x="428" y="276" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="484" y="298" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Quote price</text>
+        <text x="484" y="312" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Till · HTTP 402</text>
+
+        <rect x="564" y="188" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="620" y="210" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Request payment</text>
+        <text x="620" y="224" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Badge-signed</text>
+
+        <rect x="564" y="364" width="112" height="48" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1"/>
+        <text x="620" y="386" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Check payment</text>
+        <text x="620" y="400" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">rules · Second Look</text>
+
+        <rect x="700" y="100" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="756" y="122" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Nod on phone</text>
+        <text x="756" y="136" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">approve · deny</text>
+
+        <rect x="700" y="452" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="756" y="474" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Payout</text>
+        <text x="756" y="488" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">sandbox · re-query</text>
+
+        <rect x="836" y="364" width="112" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="892" y="386" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Receipt</text>
+        <text x="892" y="400" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">why the naira moved</text>
+
+        <!-- Legend -->
+        <line x1="40" y1="544" x2="960" y2="544" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <text x="40" y="560" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+        <rect x="40" y="572" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+        <text x="60" y="580" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Step</text>
+        <rect x="120" y="572" width="14" height="10" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1"/>
+        <text x="140" y="580" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Where Ailo decides</text>
+        <line x1="268" y1="578" x2="296" y2="578" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="304" y="580" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Always</text>
+        <line x1="372" y1="578" x2="400" y2="578" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <text x="408" y="580" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Only when a Nod is needed</text>
+        <text x="600" y="580" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Brake (kill switch) stops every step from Request payment on.</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
