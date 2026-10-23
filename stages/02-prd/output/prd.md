@@ -254,8 +254,8 @@ plain-English rule before money moves. It is the Naira and Know-Your-Agent layer
 
 | Owner | Workstream | Where |
 |-------|------------|-------|
-| **Emmanuel** (backend) | Rails: payments pipeline, reserve/holds, ledger, idempotency, Kora client + re-query, webhooks, Nod, Brake, Square Up, SSE events, Till | `apps/api` modules, `packages/till` |
-| **Adrien** (AI) | Spec Gate + Second Look (API modules), the buyer agent + MCP tools, the eval harness | `apps/api` `mandates` + `second-look`, `apps/agent` |
+| **Emmanuel** (backend) | Rails: payments pipeline, reserve/holds, ledger, idempotency, Kora client + re-query, webhooks, Nod, Square Up, SSE events, Till | `apps/api` modules, `packages/till` |
+| **Adrien** (AI) | Everything agent: Badge (agent identity + JWKS), agent-signature middleware, Brake, Spec Gate + Second Look, the buyer agent + MCP tools, the eval harness | `apps/api` `agents` + `mandates` + `second-look`, `apps/agent` |
 | **Josh** (frontend) | Console: Live feed, Rules, Receipt drawer, Agents (Badge + Brake), Square Up, Ecosystem map | `apps/console` |
 | **Chidi** (frontend) | `/nod` phone page, demo shop + poisoned page | `apps/console` `/nod`, `apps/shop` |
 
