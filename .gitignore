@@ -13,3 +13,9 @@ dist/
 CLAUDE.md
 keys/
 *.pem
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
