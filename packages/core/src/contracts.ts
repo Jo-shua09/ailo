@@ -39,6 +39,7 @@ export const Check = z.object({
   result: z.enum(["pass", "fail", "skipped"]),
   detail: z.string().optional(),
 });
+export type Check = z.infer<typeof Check>;
 
 export const Receipt = z.object({
   payment_id: id,
