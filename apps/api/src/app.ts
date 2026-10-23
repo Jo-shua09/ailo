@@ -1,13 +1,34 @@
+import { randomBytes } from "node:crypto";
 import express from "express";
+import { agentSignature } from "./middlewares/agentSignature";
 import { errorHandler } from "./middlewares/errorHandler";
 import { notFound } from "./middlewares/notFound";
-import v1 from "./routes/v1";
+import { ownerAuth } from "./middlewares/ownerAuth";
+import { InMemoryAgentRepository, type AgentRepository } from "./modules/agents/agents.repository";
+import { jwksRouter } from "./modules/agents/agents.routes";
+import { buildV1 } from "./routes/v1";
 
-export function createApp() {
+export interface AppDeps {
+  agents?: AgentRepository;
+  ownerPin?: string;
+  sessionSecret?: string;
+}
+
+export function createApp(deps: AppDeps = {}) {
+  const agents = deps.agents ?? new InMemoryAgentRepository();
+  const secret = deps.sessionSecret ? new TextEncoder().encode(deps.sessionSecret) : randomBytes(32);
+
   const app = express();
-  // The Kora webhook route must read the raw body for signature checks: mount it BEFORE express.json().
-  app.use(express.json({ limit: "100kb" }));
-  app.use("/v1", v1);
+  // Keep the raw bytes: agent signatures hash the body, and the Kora webhook HMAC needs it too.
+  app.use(express.json({ limit: "100kb", verify: (req, _res, buf) => { (req as express.Request).rawBody = buf; } }));
+  app.use(jwksRouter({ agents }));
+  app.use("/v1", buildV1({
+    agents,
+    ownerPin: deps.ownerPin,
+    secret,
+    ownerAuth: ownerAuth(secret),
+    agentAuth: agentSignature({ agents }),
+  }));
   app.use(notFound);
   app.use(errorHandler);
   return app;
