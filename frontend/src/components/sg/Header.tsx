@@ -100,6 +100,7 @@ export function Header() {
   );
 }
 export function CustomerSidebar() {
+  const pathname = usePathname();
   const sg = useSpecGate();
   return (
     <aside className="customer-sidebar border-border bg-card">
