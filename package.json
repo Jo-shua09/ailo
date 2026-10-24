@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@rolldown/binding-darwin-x64": "^1.2.15",
     "@types/node": "^26.6.5",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"
