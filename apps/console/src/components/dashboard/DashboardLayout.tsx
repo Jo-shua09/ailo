@@ -10,7 +10,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f4f6f9] flex flex-col lg:flex-row antialiased text-slate-900 selection:bg-emerald-500/20 selection:text-emerald-900">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#f4f6f9] flex flex-col lg:flex-row antialiased text-slate-900 selection:bg-emerald-500/20 selection:text-emerald-900">
       {/* Mobile top navigation header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3.5 bg-[#0c1017] text-white sticky top-0 z-40 border-b border-slate-800">
         <Link href="/dashboard">
@@ -44,10 +44,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       )}
 
       {/* Desktop static sidebar */}
-      <DashboardSidebar className="hidden lg:flex min-h-screen sticky top-0 h-screen" />
+      <DashboardSidebar className="hidden lg:flex fixed inset-y-0 left-0 h-screen" />
 
       {/* Main content canvas */}
-      <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 overflow-y-auto">
+      <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 lg:ml-64 lg:h-screen overflow-y-auto">
         {children}
       </main>
     </div>

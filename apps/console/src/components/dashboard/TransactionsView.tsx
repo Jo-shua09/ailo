@@ -104,7 +104,7 @@ export function TransactionsView() {
 
                 <div className="flex items-center justify-between sm:justify-end gap-5">
                   <p className="text-base font-extrabold text-slate-900">
-                    {naira(p.amountKobo)}
+                    {naira(p.amount_kobo)}
                   </p>
 
                   <span
@@ -152,7 +152,7 @@ export function TransactionsView() {
               <div className="text-center py-3 bg-slate-50 rounded-xl">
                 <p className="text-xs text-slate-500">{selectedPayment.payee}</p>
                 <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                  {naira(selectedPayment.amountKobo)}
+                  {naira(selectedPayment.amount_kobo)}
                 </p>
                 <p className="text-xs font-semibold text-emerald-600 mt-1 uppercase tracking-wider">
                   {selectedPayment.status}

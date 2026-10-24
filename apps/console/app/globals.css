@@ -233,6 +233,12 @@ h4 {
   width: min(1240px, 100% - 96px);
   margin-inline: auto;
 }
+.padding {
+  padding: 20px;
+}
+.gap {
+  gap: 32px;
+}
 .site-header {
   position: relative;
   z-index: 30;
@@ -454,4 +460,3 @@ h4 {
     scroll-behavior: auto !important;
   }
 }
-

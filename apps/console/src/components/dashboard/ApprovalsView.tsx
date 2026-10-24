@@ -2,50 +2,25 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Tv, ShoppingBag, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
+import { ShoppingBag, CheckCircle2, ArrowRight } from "lucide-react";
 import { useSpecGate } from "@/src/lib/specgate-store";
 import { Button } from "@/src/components/ui/button";
 
 export function ApprovalsView() {
-  const { payments, approve, deny, revoked } = useSpecGate();
-  const [deniedIds, setDeniedIds] = useState<string[]>([]);
-  const [approvedIds, setApprovedIds] = useState<string[]>([]);
+  const { approvals, payments, approve, deny, revoked } = useSpecGate();
 
   const handleApprove = (id: string) => {
-    approve(id);
-    setApprovedIds((prev) => [...prev, id]);
+    void approve(id);
   };
 
   const handleDeny = (id: string) => {
-    deny(id);
-    setDeniedIds((prev) => [...prev, id]);
+    void deny(id);
   };
 
-  // 2 requests needing attention from image
-  const requests = [
-    {
-      id: "pay_techworld",
-      merchant: "TechWorld",
-      item: "Wireless earbuds",
-      amount: "₦18,500",
-      time: "Today, 10:14 AM",
-      iconType: "tech",
-      isSuspicious: true,
-    },
-    {
-      id: "pay_agromart",
-      merchant: "AgroMart",
-      item: "Bulk rice (70kg)",
-      amount: "₦12,000",
-      time: "Today, 09:15 AM",
-      iconType: "agro",
-      isSuspicious: false,
-    },
-  ];
-
-  const pendingRequests = requests.filter(
-    (r) => !deniedIds.includes(r.id) && !approvedIds.includes(r.id),
-  );
+  const pendingRequests = approvals.filter((approval) => approval.status === "pending").map((approval) => {
+    const payment = payments.find((item) => item.id === approval.payment_id);
+    return { id: approval.id, merchant: approval.payee_name, item: payment?.label || "Payment request", amount: `₦${(approval.amount_kobo / 100).toLocaleString()}`, time: new Date(approval.created_at).toLocaleString(), isSuspicious: payment?.aiVerdict.action === "block" };
+  });
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -88,17 +63,9 @@ export function ApprovalsView() {
               {/* Left Side: Avatar + Merchant & Item */}
               <div className="flex items-center gap-4">
                 <div
-                  className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl ${
-                    req.iconType === "tech"
-                      ? "bg-slate-100 text-slate-700"
-                      : "bg-emerald-50 text-emerald-600"
-                  }`}
+                  className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"
                 >
-                  {req.iconType === "tech" ? (
-                    <Tv className="h-6 w-6 stroke-[1.75]" />
-                  ) : (
-                    <ShoppingBag className="h-6 w-6 stroke-[1.75]" />
-                  )}
+                  <ShoppingBag className="h-6 w-6 stroke-[1.75]" />
                 </div>
 
                 <div>
@@ -111,7 +78,6 @@ export function ApprovalsView() {
                         href="/nod/risk"
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
                       >
-                        <AlertCircle className="h-3 w-3 text-rose-500" />
                         Second Look Flagged
                       </Link>
                     )}

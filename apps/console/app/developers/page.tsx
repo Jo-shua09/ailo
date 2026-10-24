@@ -31,15 +31,13 @@ app.get("/v1/fabric-index", specgate.accept({ price_kobo: 50000 }), handler);
 // Signed retry  → KYA verified → 200 OK + resource`;
 
 const ENDPOINTS = [
-  ["POST", "/v1/agents", "Register agent, issue KYA + scoped key"],
-  ["POST", "/v1/mandates", "Create mandate from plain English"],
-  ["POST", "/v1/mandates/:id/revoke", "Kill switch"],
-  ["POST", "/v1/payments", "Agent payment (Idempotency-Key)"],
-  ["GET", "/v1/payments/:id", "Status + trace"],
-  ["POST", "/v1/approvals/:id", "Owner approves or denies"],
-  ["POST", "/v1/escrows/:id/release", "Release on outcome"],
-  ["POST", "/v1/webhooks/kora", "Signature verified, then re-queried"],
-  ["GET", "/v1/verify-agent", "Payees verify a KYA credential"],
+  ["GET", "/v1/health", "Health check"], ["GET", "/.well-known/jwks.json", "Active agents’ public keys"],
+  ["POST", "/v1/owner/session", "Create owner session from PIN"], ["POST", "/v1/agents", "Register agent public key"],
+  ["GET", "/v1/agents", "List agents"], ["GET", "/v1/agents/me", "Get signed-in agent"], ["POST", "/v1/agents/:id/brake", "Pull agent brake"],
+  ["POST", "/v1/ledger/topup", "Top up owner wallet"], ["GET", "/v1/ledger/balances", "Get ledger balances"],
+  ["POST", "/v1/payments", "Submit signed payment"], ["GET", "/v1/payments", "List payments"], ["GET", "/v1/payments/:id", "Get payment and receipt"],
+  ["GET", "/v1/approvals", "List pending approvals"], ["POST", "/v1/approvals/:id", "Approve or deny"],
+  ["POST", "/v1/webhooks/kora", "Receive Kora webhook"], ["POST", "/v1/ops/reconcile", "Reconcile with Kora"], ["GET", "/v1/events", "Live server events (SSE)"],
 ];
 
 export default function DevPage() {

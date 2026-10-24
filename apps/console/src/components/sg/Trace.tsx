@@ -30,7 +30,7 @@ export function TraceInspector({ payment }: { payment?: Payment | undefined }) {
       <div className="mt-2">
         <Row k="Amount">
           <span className="num">
-            {naira(p.amountKobo)} · {kobo(p.amountKobo)}
+            {naira(p.amount_kobo)} · {kobo(p.amount_kobo)}
           </span>
         </Row>
         <Row k="Idempotency-Key">
@@ -52,10 +52,10 @@ export function TraceInspector({ payment }: { payment?: Payment | undefined }) {
           <span className="num text-muted-foreground">({p.ruleCheck.detail})</span>
         </Row>
         <Row k="AI Intent Verdict">
-          <span className={cn("num font-bold", p.aiVerdict.pass ? "text-primary" : "text-destructive")}>
-            {p.aiVerdict.pass ? "PASS" : "FAIL"} ({p.aiVerdict.score.toFixed(2)} Alignment)
+          <span className={cn("num font-bold", p.aiVerdict.action === "ok" ? "text-primary" : "text-destructive")}>
+            {p.aiVerdict.action}
           </span>
-          <div className="mt-1 italic text-muted-foreground">{p.aiVerdict.detail}</div>
+          <div className="mt-1 italic text-muted-foreground">{p.aiVerdict.reason}</div>
         </Row>
         <Row k="Agent Reason">
           <span className="italic text-muted-foreground">"{p.reason}"</span>
@@ -75,7 +75,7 @@ export function TraceInspector({ payment }: { payment?: Payment | undefined }) {
               <div className="text-primary">Re-Query Status: CONFIRMED</div>
             </div>
           ) : (
-            <span className="num text-dim">{p.status === "blocked" || p.status === "denied" ? "None — 0 kobo moved" : "Awaiting settlement"}</span>
+          <span className="num text-dim">{p.status === "blocked" || p.status === "failed" ? "None — 0 kobo moved" : "Awaiting settlement"}</span>
           )}
         </Row>
       </div>
