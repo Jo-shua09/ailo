@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { ShoppingBag, CheckCircle2, ArrowRight } from "lucide-react";
-import { useSpecGate } from "@/src/lib/specgate-store";
+import { getPendingApprovalItems, useSpecGate } from "@/src/lib/specgate-store";
 import { Button } from "@/src/components/ui/button";
 import { DataStatus } from "./DataStatus";
 
@@ -22,10 +22,15 @@ export function ApprovalsView() {
     void deny(id);
   };
 
-  const pendingRequests = approvals.filter((approval) => ["pending", "pending_approval"].includes(String(approval.status || "pending").toLowerCase())).map((approval) => {
-    const payment = payments.find((item) => item.id === approval.payment_id);
-    return { id: approval.id, merchant: approval.payee_name, item: payment?.label || "Payment request", amount: `₦${(approval.amount_kobo / 100).toLocaleString()}`, time: new Date(approval.created_at).toLocaleString(), isSuspicious: payment?.aiVerdict.action === "block" };
-  });
+  const pendingRequests = getPendingApprovalItems(approvals, payments).map(({ approval, payment }) => ({
+    id: approval?.id ?? payment!.id,
+    canDecide: Boolean(approval),
+    merchant: approval?.payee_name || payment!.payee,
+    item: payment?.label || "Payment request",
+    amount: `₦${((approval?.amount_kobo ?? payment!.amountKobo) / 100).toLocaleString()}`,
+    time: new Date(approval?.created_at ?? payment!.createdAt).toLocaleString(),
+    isSuspicious: payment?.aiVerdict.action === "block",
+  }));
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
@@ -41,7 +46,11 @@ export function ApprovalsView() {
 
       <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
 
-      {loading || approvalsLoadError ? null : pendingRequests.length === 0 ? (
+      {loading ? null : pendingRequests.length === 0 && approvalsLoadError ? (
+        <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+          Could not confirm the approvals list. Retry loading your account data.
+        </div>
+      ) : pendingRequests.length === 0 ? (
         <div className="rounded-2xl bg-white p-12 text-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-4">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
             <CheckCircle2 className="h-7 w-7" />
@@ -107,7 +116,7 @@ export function ApprovalsView() {
 
               {/* Right Side: Deny & Approve pill buttons */}
               <div className="flex items-center gap-2.5 pl-17 sm:pl-0 self-start sm:self-auto">
-                <button
+                {req.canDecide ? <><button
                   onClick={() => handleDeny(req.id)}
                   className="rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2 text-xs font-semibold transition-all duration-150 active:scale-98"
                 >
@@ -120,7 +129,7 @@ export function ApprovalsView() {
                   className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-2 text-xs font-semibold transition-all duration-150 active:scale-98 shadow-xs"
                 >
                   Approve
-                </button>
+                </button></> : <p className="max-w-48 text-right text-xs text-amber-700">Approval details are still syncing. Refresh shortly to review this request.</p>}
               </div>
             </div>
           ))}

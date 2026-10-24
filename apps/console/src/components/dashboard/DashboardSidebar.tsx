@@ -16,7 +16,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { AiloBrand } from "./AiloLogo";
-import { useSpecGate } from "@/src/lib/specgate-store";
+import { getPendingApprovalItems, useSpecGate } from "@/src/lib/specgate-store";
 import { cn } from "@/src/lib/utils";
 
 export const DASHBOARD_NAV = [
@@ -37,15 +37,8 @@ export function DashboardSidebar({
   className?: string;
 }) {
   const pathname = usePathname();
-  const { payments } = useSpecGate();
-
-  const pendingApprovalsCount = payments.filter(
-    (p) =>
-      p.status === "pending_approval" ||
-      p.status === "approved" ||
-      p.status === "escrow_held" ||
-      p.status === "submitted",
-  ).length;
+  const { payments, approvals } = useSpecGate();
+  const pendingApprovalsCount = getPendingApprovalItems(approvals, payments).length;
 
   return (
     <aside
