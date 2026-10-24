@@ -1,4 +1,6 @@
 import json
+import os
+import signal
 import subprocess
 from pathlib import Path
 
@@ -11,21 +13,29 @@ from ailo_agent.keys import new_private_key, public_jwk
 API_DIR = Path(__file__).resolve().parents[2] / "api"
 
 
+WINDOWS = os.name == "nt"
+
+
 @pytest.fixture(scope="module")
 def api_url():
+    # npx is a .cmd shim on Windows (needs the shell); elsewhere start a new process group to kill as one.
     proc = subprocess.Popen(
-        ["npx", "tsx", "src/test/serve.ts"], cwd=API_DIR, stdout=subprocess.PIPE, text=True, shell=True,
+        ["npx", "tsx", "src/test/serve.ts"], cwd=API_DIR, stdout=subprocess.PIPE, text=True,
+        shell=WINDOWS, start_new_session=not WINDOWS,
     )
     try:
         port = json.loads(proc.stdout.readline())["port"]
         yield f"http://127.0.0.1:{port}"
     finally:
-        # shell=True on Windows: kill the whole tree, or the node server outlives the test.
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+        # Kill the whole process tree, or the node server outlives the test.
+        if WINDOWS:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+        else:
+            os.killpg(proc.pid, signal.SIGTERM)
 
 
 def register(api_url: str, jwk: dict) -> tuple[str, str]:
-    token = httpx.post(f"{api_url}/v1/owner/session", json={"pin": "2468"}).json()["token"]
+    token = httpx.post(f"{api_url}/v1/owner/session", json={"pin": "246810"}).json()["token"]
     res = httpx.post(f"{api_url}/v1/agents", json={"name": "Shop agent", "public_jwk": jwk},
                      headers={"authorization": f"Owner {token}"})
     assert res.status_code == 201, res.text
