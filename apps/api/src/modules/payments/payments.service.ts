@@ -4,7 +4,16 @@ import { eventsService } from "../events/events.service";
 import { ledgerService } from "../ledger/ledger.service";
 import { approvalsService } from "../approvals/approvals.service";
 import * as mandates from "../mandates/mandates.service";
+import { getPayee } from "../payees/payees";
 import { getPayoutRail } from "../rails";
+
+// Bank details and email come only from the server-side payee directory, never from the agent (PRD 5.9).
+function payoutAccount(payeeId: string) {
+  const payee = getPayee(payeeId);
+  return payee
+    ? { destination_bank_code: payee.bank_code, destination_account_number: payee.account_number, payee_email: payee.email }
+    : {};
+}
 import { paymentsRepository, PaymentsRepository } from "./payments.repository";
 
 export class PaymentsService {
@@ -66,7 +75,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -114,7 +123,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -155,7 +164,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -192,7 +201,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -240,7 +249,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -279,8 +288,9 @@ export class PaymentsService {
       reference,
       amount_kobo: req.amount_kobo,
       payee_id: req.payee_id,
-      payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+      payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
       narration: req.reason,
+      ...payoutAccount(req.payee_id),
     });
 
     if (payoutResult.status === "settled") {
@@ -309,7 +319,7 @@ export class PaymentsService {
       id: paymentId,
       agent_id: agent.id,
       payee_id: req.payee_id,
-      payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+      payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
       amount_kobo: req.amount_kobo,
       category: req.category,
       reason: req.reason,
@@ -344,6 +354,7 @@ export class PaymentsService {
       payee_id: record.payee_id,
       payee_name: record.payee_name,
       narration: record.reason,
+      ...payoutAccount(record.payee_id),
     });
 
     const newChecks: Check[] = [];
