@@ -43,11 +43,21 @@ export function AiloRibbonMark({ className = "h-7 w-7" }: { className?: string }
   );
 }
 
-export function AiloBrand({ className = "" }: { className?: string }) {
+export function AiloBrand({
+  className = "",
+  theme = "dark",
+}: {
+  className?: string;
+  theme?: "dark" | "light";
+}) {
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <AiloRibbonMark className="h-8 w-8 shrink-0" />
-      <span className="text-xl font-bold tracking-tight text-white font-sans">
+      <span
+        className={`text-xl font-bold tracking-tight font-sans ${
+          theme === "light" ? "text-slate-900" : "text-white"
+        }`}
+      >
         Ailo
       </span>
     </div>

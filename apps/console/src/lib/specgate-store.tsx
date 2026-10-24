@@ -7,20 +7,36 @@ import { API, getToken, ownerFetch } from "./api";
 export const WEEKLY_CAP_KOBO = 5_000_000;
 export const THRESHOLD_KOBO = 1_000_000;
 
-export type PaymentStatus = "pending_approval" | "settled" | "blocked" | "failed";
+export type PaymentStatus =
+  | "requested"
+  | "blocked"
+  | "pending_approval"
+  | "approved"
+  | "escrow_held"
+  | "submitted"
+  | "settled"
+  | "denied"
+  | "failed";
 
 export type Payment = {
   id: string;
   step: number;
   label: string;
   payee: string;
+  amountKobo: number;
   amount_kobo: number;
   category: string;
   reason: string;
   idem: string;
   status: PaymentStatus;
   ruleCheck: { pass: boolean; detail: string };
-  aiVerdict: { action: "ok" | "escalate" | "block"; reason: string };
+  aiVerdict: {
+    pass?: boolean;
+    score?: number;
+    detail?: string;
+    action?: "ok" | "escalate" | "block";
+    reason?: string;
+  };
   code?: string;
   koraRef?: string;
   replays: number;
@@ -123,7 +139,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       ]);
       setPayments((paymentData.payments || []).map((p) => ({
         id: String(p.id), step: 0, label: String(p.narration || p.reason || "Payment"),
-        payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0),
+        payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0), amountKobo: Number(p.amount_kobo || 0),
         category: String(p.category || ""), reason: String(p.reason || p.narration || ""), idem: String(p.idempotency_key || ""),
         status: p.status as PaymentStatus, ruleCheck: { pass: true, detail: String(p.rule_check?.toString() || "Server rules applied") },
         aiVerdict: (p.second_look as Payment["aiVerdict"]) || { action: "ok", reason: "No Second Look detail" },

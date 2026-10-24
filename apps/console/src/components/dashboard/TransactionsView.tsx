@@ -183,7 +183,7 @@ export function TransactionsView() {
                   {selectedPayment.ruleCheck.detail}
                 </p>
                 <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                  AI Verdict: {selectedPayment.aiVerdict.detail}
+                  AI Verdict: {selectedPayment.aiVerdict.detail || selectedPayment.aiVerdict.reason}
                 </p>
               </div>
             </div>

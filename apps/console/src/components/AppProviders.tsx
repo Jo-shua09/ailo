@@ -16,6 +16,7 @@ function Shell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const customerApp = customerRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+
   useEffect(() => {
     const token = getToken();
     setAuthenticated(Boolean(token));
@@ -25,6 +26,11 @@ function Shell({ children }: { children: ReactNode }) {
   if (customerApp) {
     if (!authenticated) return null;
     return <DashboardLayout>{children}</DashboardLayout>;
+  }
+
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  if (isAuthPage) {
+    return <main className="w-full min-h-screen">{children}</main>;
   }
 
   return (
