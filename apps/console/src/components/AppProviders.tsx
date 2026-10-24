@@ -21,6 +21,13 @@ function Shell({ children }: { children: ReactNode }) {
     const token = getToken();
     setAuthenticated(Boolean(token));
     if (customerApp && !token) router.replace("/login");
+
+    const expireSession = () => {
+      setAuthenticated(false);
+      if (customerApp) router.replace("/login");
+    };
+    window.addEventListener("ailo:session-expired", expireSession);
+    return () => window.removeEventListener("ailo:session-expired", expireSession);
   }, [customerApp, pathname, router]);
 
   if (customerApp) {

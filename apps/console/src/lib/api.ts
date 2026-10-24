@@ -9,7 +9,7 @@ const TOKEN_KEY = "ailo_owner_token";
 export function getToken() {
   if (typeof window === "undefined") return null;
   const token = window.localStorage.getItem(TOKEN_KEY);
-  if (token === "local-demo-session") {
+  if (token === "local-demo-session" || token === "ailo_session_chidi_okeke") {
     window.localStorage.removeItem(TOKEN_KEY);
     return null;
   }
@@ -37,7 +37,14 @@ export async function ownerFetch<T = unknown>(path: string, init: RequestInit = 
     ...init,
     headers: { "Content-Type": "application/json", ...init.headers, Authorization: `Owner ${token}` },
   });
-  if (!response.ok) throw new Error(`Request failed (${response.status}): ${path}`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      window.dispatchEvent(new Event("ailo:session-expired"));
+      throw new Error("Your session expired. Please sign in again.");
+    }
+    throw new Error(`Request failed (${response.status}): ${path}`);
+  }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }

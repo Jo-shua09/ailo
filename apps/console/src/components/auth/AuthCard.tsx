@@ -35,21 +35,11 @@ export function AuthCard({ initialMode = "login" }: { initialMode?: "login" | "s
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState("");
-  const [pin, setPin] = useState("1234");
+  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleGoogleAuth = () => {
-    setBusy(true);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("ailo_owner_token", "ailo_session_chidi_okeke");
-      window.dispatchEvent(new Event("ailo:session"));
-    }
-    setTimeout(() => {
-      router.replace("/dashboard");
-    }, 200);
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +47,7 @@ export function AuthCard({ initialMode = "login" }: { initialMode?: "login" | "s
     setError("");
 
     try {
-      try {
-        await signIn(pin);
-      } catch {
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem("ailo_owner_token", "ailo_session_chidi_okeke");
-          window.dispatchEvent(new Event("ailo:session"));
-        }
-      }
+      await signIn(pin);
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed. Try again.");
@@ -111,7 +94,7 @@ export function AuthCard({ initialMode = "login" }: { initialMode?: "login" | "s
 
               <button
                 type="button"
-                onClick={handleGoogleAuth}
+                onClick={() => { setError("Google sign-in is not connected yet. Use your owner PIN."); setShowEmailForm(true); }}
                 disabled={busy}
                 className="w-full rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 py-3.5 px-4 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xs transition-all duration-150 active:scale-99"
               >
@@ -161,7 +144,7 @@ export function AuthCard({ initialMode = "login" }: { initialMode?: "login" | "s
                 <input
                   type="password"
                   required
-                  placeholder="Enter 4-digit PIN"
+                  placeholder="Enter your owner PIN"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-800/10"
