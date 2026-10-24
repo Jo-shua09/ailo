@@ -1,4 +1,5 @@
 import type { Payment, LedgerEntry } from "./specgate-store";
+
 export const DEMO_PAYMENTS: Payment[] = [
   {
     id: "pay_02",
@@ -14,6 +15,21 @@ export const DEMO_PAYMENTS: Payment[] = [
     aiVerdict: { pass: true, score: 0.95, detail: "This purchase matches your shop restocking goal." },
     replays: 0,
     createdAt: 1792786440000,
+  },
+  {
+    id: "pay_03",
+    step: 6,
+    label: "Display shelving unit",
+    payee: "Alaba Market Direct",
+    amountKobo: 1450000,
+    category: "store_fixtures",
+    reason: "New retail display unit for store entrance merchandising.",
+    idem: "ailo_shelf_01",
+    status: "pending_approval",
+    ruleCheck: { pass: true, detail: "Within weekly cap. Above single transaction threshold of ₦10,000." },
+    aiVerdict: { pass: true, score: 0.92, detail: "Requested equipment aligns with store upgrade mandate." },
+    replays: 0,
+    createdAt: 1792786600000,
   },
   {
     id: "pay_poison",
@@ -52,6 +68,7 @@ export const DEMO_PAYMENTS: Payment[] = [
     createdAt: 1792785120000,
   },
 ];
+
 export const DEMO_LEDGER: LedgerEntry[] = [
   { id: "le_demo_1", txn: "pay_01", account: "owner_treasury", debit: 850000, credit: 0, memo: "Rice for the shop" },
   { id: "le_demo_2", txn: "pay_01", account: "payee_settlement_kora", debit: 0, credit: 850000, memo: "Rice for the shop" },

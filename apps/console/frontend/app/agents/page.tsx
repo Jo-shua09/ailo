@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Agents } from "@/src/components/customer/Workspace";
+import { AgentsView } from "@/src/components/dashboard/AgentsView";
 
 export const metadata: Metadata = {
-  title: "Your assistants",
-  description: "Manage your shop assistant and stop spending whenever you need to.",
+  title: "AI Agents · Ailo",
+  description: "Manage your AI agents and their spending permissions.",
 };
 
-export default Agents;
+export default function AgentsPage() {
+  return <AgentsView />;
+}

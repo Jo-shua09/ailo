@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Dashboard } from "@/src/components/customer/Workspace";
+import { DashboardOverview } from "@/src/components/dashboard/DashboardOverview";
 
 export const metadata: Metadata = {
-  title: "Your business overview",
-  description: "Your allowance, recent purchases and payment requests in one simple workspace.",
+  title: "Dashboard · Ailo",
+  description: "Monitor your AI agent allowance, spending, and pending approvals.",
 };
 
-export default Dashboard;
+export default function DashboardPage() {
+  return <DashboardOverview />;
+}

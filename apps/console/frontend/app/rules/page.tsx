@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Rules } from "@/src/components/customer/Workspace";
+import { RulesView } from "@/src/components/dashboard/RulesView";
 
 export const metadata: Metadata = {
-  title: "Spending rules",
-  description: "Set a weekly allowance and decide when your assistant should ask for approval.",
+  title: "Rules (Spec Gate) · Ailo",
+  description: "Set spending rules and approval boundaries for your AI assistants.",
 };
 
-export default Rules;
+export default function RulesPage() {
+  return <RulesView />;
+}

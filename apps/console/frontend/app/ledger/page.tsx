@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Payments } from "@/src/components/customer/Workspace";
+import { TransactionsView } from "@/src/components/dashboard/TransactionsView";
 
 export const metadata: Metadata = {
-  title: "Your payments",
-  description: "Review every purchase, approval and payment confirmation in your Ailo workspace.",
+  title: "Ledger (Receipt) · Ailo",
+  description: "Detailed ledger records and Kora payment settlements.",
 };
 
-export default Payments;
+export default function LedgerPage() {
+  return <TransactionsView />;
+}

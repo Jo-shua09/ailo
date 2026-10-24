@@ -7,7 +7,7 @@ import { DEMO_PAYMENTS, DEMO_LEDGER } from "./ailo-demo";
 
 export const WEEKLY_CAP_KOBO = 5_000_000;
 export const THRESHOLD_KOBO = 1_000_000;
-const STARTING_SPENT_KOBO = 850_000;
+const STARTING_SPENT_KOBO = 1_245_000;
 
 export type PaymentStatus = "requested" | "blocked" | "pending_approval" | "approved" | "escrow_held" | "submitted" | "settled" | "denied" | "failed";
 
@@ -42,6 +42,54 @@ export type ProtoFrame = { id: string; from: "agent" | "gate" | "payee"; tone: "
 
 export type PhoneNotice = { id: string; tone: "ok" | "warn" | "bad"; title: string; body: string };
 
+export type Agent = {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+  status: "active" | "paused";
+  spentThisWeek: string;
+  allowanceKobo: number;
+  thresholdKobo: number;
+  description: string;
+};
+
+export const INITIAL_AGENTS: Agent[] = [
+  {
+    id: "shop-agent",
+    name: "Shop Agent",
+    role: "Shopping & inventory",
+    avatar: "/images/shop-agent.jpg",
+    status: "active",
+    spentThisWeek: "₦12,450 spent this week",
+    allowanceKobo: 5_000_000,
+    thresholdKobo: 1_000_000,
+    description: "Monitors shop inventory, sources items from vetted suppliers, and initiates purchases within rules.",
+  },
+  {
+    id: "research-agent",
+    name: "Research Agent",
+    role: "Information & research",
+    avatar: "/images/research-agent.jpg",
+    status: "active",
+    spentThisWeek: "₦0 spent this week",
+    allowanceKobo: 1_000_000,
+    thresholdKobo: 200_000,
+    description: "Tracks wholesale market prices, identifies trends across Lagos hubs, and compiles market reports.",
+  },
+  {
+    id: "content-agent",
+    name: "Content Agent",
+    role: "Content creation & marketing",
+    avatar: "/images/content-agent.jpg",
+    status: "paused",
+    spentThisWeek: "₦0 spent this week",
+    allowanceKobo: 1_500_000,
+    thresholdKobo: 300_000,
+    description: "Drafts product showcases, WhatsApp marketing messages, and promotional campaign copies.",
+  },
+];
+
 type Store = {
   compiled: boolean;
   compiling: boolean;
@@ -51,6 +99,9 @@ type Store = {
   spentKobo: number;
   payments: Payment[];
   ledger: LedgerEntry[];
+  agents: Agent[];
+  addAgent: (agent: Agent) => void;
+  toggleAgentStatus: (id: string) => void;
   frames: ProtoFrame[];
   notices: PhoneNotice[];
   attackSnippet: boolean;
@@ -127,6 +178,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [spentKobo, setSpent] = useState(STARTING_SPENT_KOBO);
   const [payments, setPayments] = useState<Payment[]>(DEMO_PAYMENTS);
   const [ledger, setLedger] = useState<LedgerEntry[]>(DEMO_LEDGER);
+  const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
   const [frames, setFrames] = useState<ProtoFrame[]>([]);
   const [notices, setNotices] = useState<PhoneNotice[]>([]);
   const [attackSnippet, setAttackSnippet] = useState(false);
@@ -138,162 +190,164 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
 
   const later = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
   const done = (n: number) => setCompleted((c) => (c.includes(n) ? c : [...c, n]));
-  const frame = (f: Omit<ProtoFrame, "id">) => setFrames((fs) => [...fs.slice(-14), { ...f, id: uid("f") }]);
-  const notify = (n: Omit<PhoneNotice, "id">) => setNotices((ns) => [{ ...n, id: uid("n") }, ...ns].slice(0, 6));
-  const patch = (id: string, p: Partial<Payment>) => setPayments((ps) => ps.map((x) => (x.id === id ? { ...x, ...p } : x)));
 
-  const post = (txn: string, from: LedgerEntry["account"], to: LedgerEntry["account"], amt: number, memo: string) =>
-    setLedger((l) => [
-      ...l,
-      { id: uid("le"), txn, account: from, debit: amt, credit: 0, memo },
-      { id: uid("le"), txn, account: to, debit: 0, credit: amt, memo },
-    ]);
+  const addAgent = useCallback((agent: Agent) => {
+    setAgents((prev) => [...prev, agent]);
+  }, []);
 
-  const reject = (n: number) => {
-    const s = SCENARIOS[n];
-    if (!s) return;
-    const p: Payment = {
-      ...s,
-      id: uid("pi"),
-      step: n,
-      status: "blocked",
-      code: "MANDATE_REVOKED",
-      ruleCheck: { pass: false, detail: "Mandate mnd_01J8X9 status = REVOKED" },
-      aiVerdict: { pass: false, score: 0, detail: "Not evaluated — mandate revoked before intent check." },
-      replays: 0,
-      createdAt: Date.now(),
-    };
-    setPayments((ps) => [p, ...ps]);
-    select(p.id);
-    frame({ from: "gate", tone: "bad", text: `403 MANDATE_REVOKED · ${s.label} refused · 0 kobo moved` });
-    setBanner("REFUSED • CODE: MANDATE_REVOKED • 0 KOBO MOVED");
+  const toggleAgentStatus = useCallback((id: string) => {
+    setAgents((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: a.status === "active" ? "paused" : "active" } : a))
+    );
+  }, []);
+
+  const clearTimers = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
   };
 
+  const notify = (notice: PhoneNotice) => {
+    setNotices((n) => [...n, notice]);
+  };
+
+  const pushFrame = (frame: ProtoFrame) => {
+    setFrames((f) => [...f, frame]);
+  };
+
+  const compile = useCallback((_ruleText: string) => {
+    setCompiling(true);
+    setCompiled(false);
+    clearTimers();
+    setFrames([]);
+    setBanner(null);
+
+    later(300, () => {
+      setCompiling(false);
+      setCompiled(true);
+      done(1);
+    });
+  }, []);
+
   const runStep = useCallback(
-    (n: number) => {
-      if (n === 1) {
-        if (revokedRef.current) return;
-        setCompiling(true);
-        later(400, () => {
-          setCompiling(false);
-          setCompiled(true);
-          done(1);
-          frame({ from: "gate", tone: "ok", text: "Mandate mnd_01J8X9 compiled · status ACTIVE" });
-        });
-        return;
-      }
-      if (n === 6) {
-        revokedRef.current = true;
-        setRevoked(true);
-        done(6);
-        frame({ from: "gate", tone: "bad", text: "POST /v1/mandates/mnd_01J8X9/revoke → MANDATE_REVOKED" });
-        notify({ tone: "bad", title: "Mandate revoked", body: "Kill switch engaged. agt_shop_buyer_01 can no longer pay." });
-        return;
-      }
-      const s = SCENARIOS[n];
-      if (!s) return;
-      if (revokedRef.current) return reject(n);
-      if (!compiled) {
-        frame({ from: "gate", tone: "warn", text: "No active mandate — compile the mandate first (step 1)" });
-        return;
-      }
+    (step: number) => {
+      if (revokedRef.current) return;
+      clearTimers();
+      setFrames([]);
       setBanner(null);
-      setAttackSnippet(n === 4);
-      const p: Payment = { ...s, id: uid("pi"), step: n, status: "requested", replays: 0, createdAt: Date.now() };
-      setPayments((ps) => [p, ...ps]);
-      select(p.id);
 
-      const isApi = n === 2;
-      const target = isApi ? "GET /v1/fabric-index" : n === 4 ? "GET /products/ankara-bundle" : "POST /checkout";
-      frame({ from: "agent", tone: "info", text: `${target} → ${s.payee}` });
+      if (step === 1) {
+        compile(englishRule);
+        return;
+      }
 
-      if (n === 4) {
-        later(350, () => frame({ from: "payee", tone: "warn", text: "200 OK · page contains hidden HTML comment" }));
-        later(750, () => frame({ from: "agent", tone: "info", text: "MCP pay({ amount_kobo: 4500000, to: 0129384756 })" }));
-        later(1150, () => {
-          frame({ from: "gate", tone: "bad", text: "Rule check FAIL · AI intent FAIL (0.03) · INTENT_DRIFT_INJECTION" });
-          patch(p.id, { status: "blocked" });
-          setBanner("BLOCKED BY AI INTENT CHECK • CODE: INTENT_DRIFT_INJECTION • 0 KOBO MOVED");
-          notify({ tone: "bad", title: "🛡️ Attack blocked", body: "Spec Gate blocked a ₦45,000 prompt injection attempt." });
+      const scen = SCENARIOS[step];
+      if (!scen) return;
+
+      const pid = uid("pay");
+      const payment: Payment = {
+        ...scen,
+        id: pid,
+        step,
+        status: "requested",
+        replays: 0,
+        createdAt: Date.now(),
+      };
+
+      setPayments((p) => [payment, ...p]);
+      select(pid);
+
+      later(400, () => {
+        pushFrame({ id: uid("f"), from: "agent", tone: "info", text: `Payment request: ${scen.label} (${scen.amountKobo / 100} NGN)` });
+      });
+
+      if (step === 2) {
+        later(900, () => {
+          pushFrame({ id: uid("f"), from: "gate", tone: "ok", text: `Allowance ok: ${scen.ruleCheck.detail}` });
+          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "settled", koraRef: koraRef() } : p)));
+          setSpent((s) => s + scen.amountKobo);
+          done(2);
+        });
+      } else if (step === 3) {
+        later(900, () => {
+          pushFrame({ id: uid("f"), from: "gate", tone: "ok", text: `Rule check passed. Below threshold.` });
+          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "settled", koraRef: koraRef() } : p)));
+          setSpent((s) => s + scen.amountKobo);
+          done(3);
+        });
+      } else if (step === 4) {
+        setAttackSnippet(true);
+        later(900, () => {
+          pushFrame({ id: uid("f"), from: "gate", tone: "bad", text: `AI Gate BLOCKED: Prompt injection detected.` });
+          setBanner("INTENT DRIFT: AI Gate intercepted unauthorized transfer.");
+          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "blocked" } : p)));
+          notify({
+            id: uid("n"),
+            tone: "bad",
+            title: "Threat Blocked",
+            body: "A rogue prompt injection attempting to spend was stopped.",
+          });
           done(4);
         });
-        return;
-      }
-
-      later(350, () => frame({ from: "payee", tone: "warn", text: `402 Payment Required · price_kobo: ${s.amountKobo}` }));
-      later(750, () => frame({ from: "agent", tone: "info", text: `Retry w/ KYA sig (Ed25519) · Idempotency-Key: ${s.idem}` }));
-      later(1100, () => frame({ from: "gate", tone: "ok", text: `Rule PASS · AI intent PASS (${s.aiVerdict.score})` }));
-
-      if (n === 5) {
-        later(1450, () => {
-          patch(p.id, { status: "pending_approval" });
-          frame({ from: "gate", tone: "warn", text: "Above ₦10,000 → pending_approval · owner phone pinged" });
+      } else if (step === 5) {
+        later(900, () => {
+          pushFrame({ id: uid("f"), from: "gate", tone: "warn", text: `Above approval threshold. Asking owner.` });
+          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "pending_approval" } : p)));
+          notify({
+            id: uid("n"),
+            tone: "warn",
+            title: "Approval Needed",
+            body: `${scen.label} is above threshold. Your nod is required.`,
+          });
           done(5);
         });
-        return;
       }
-      later(1450, () => {
-        const ref = koraRef();
-        patch(p.id, { status: "settled", koraRef: ref });
-        post(p.id, "owner_treasury", "payee_settlement_kora", s.amountKobo, s.label);
-        setSpent((x) => x + s.amountKobo);
-        frame({ from: "payee", tone: "ok", text: `200 OK · resource unlocked · Kora ${ref} CONFIRMED` });
-        done(n);
-      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [compiled],
+    [compile, englishRule],
   );
 
   const approve = (id: string) => {
-    const p = payments.find((x) => x.id === id);
-    if (!p || p.status !== "pending_approval") return;
-    if (revokedRef.current) return;
-    patch(id, { status: "approved" });
-    frame({ from: "gate", tone: "ok", text: "Owner approved · locking escrow" });
-    later(500, () => {
-      patch(id, { status: "escrow_held" });
-      post(id, "owner_treasury", "specgate_escrow", p.amountKobo, "Escrow hold");
-      setSpent((x) => x + p.amountKobo);
-      frame({ from: "gate", tone: "warn", text: `escrow_held · ${p.amountKobo.toLocaleString()} kobo until delivery` });
-    });
-  };
-  const deny = (id: string) => {
-    patch(id, { status: "denied", code: "OWNER_DENIED" });
-    frame({ from: "gate", tone: "bad", text: "Owner denied · 0 kobo moved" });
-  };
-  const release = (id: string) => {
-    const p = payments.find((x) => x.id === id);
-    if (!p || p.status !== "escrow_held") return;
-    patch(id, { status: "submitted" });
+    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "approved" } : p)));
     later(600, () => {
-      const ref = koraRef();
-      patch(id, { status: "settled", koraRef: ref });
-      post(id, "specgate_escrow", "payee_settlement_kora", p.amountKobo, "Escrow release");
-      frame({ from: "payee", tone: "ok", text: `Delivery confirmed · Kora payout ${ref} settled` });
-      notify({ tone: "ok", title: "Payment settled", body: `₦12,000 released to ${p.payee}.` });
+      setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "settled", koraRef: koraRef() } : p)));
+      const p = payments.find((item) => item.id === id);
+      if (p) setSpent((s) => s + p.amountKobo);
     });
   };
-  const replay = (id: string) => {
-    const p = payments.find((x) => x.id === id);
-    if (!p) return;
-    patch(id, { replays: p.replays + 1 });
-    frame({ from: "gate", tone: "ok", text: `Replay ${p.idem} → cached receipt · 0 duplicate payout` });
+
+  const deny = (id: string) => {
+    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "denied" } : p)));
   };
-  const revoke = () => runStep(6);
+
+  const release = (id: string) => {
+    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "settled", koraRef: koraRef() } : p)));
+  };
+
+  const replay = (id: string) => {
+    setPayments((list) => list.map((p) => (p.id === id ? { ...p, replays: (p.replays || 0) + 1 } : p)));
+  };
+
+  const revoke = () => {
+    revokedRef.current = true;
+    setRevoked(true);
+    setAgents((prev) => prev.map((a) => ({ ...a, status: "paused" })));
+    notify({
+      id: uid("n"),
+      tone: "bad",
+      title: "Emergency Brake Engaged",
+      body: "All agents paused. All outbound spending stopped.",
+    });
+  };
+
   const reset = () => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
     revokedRef.current = false;
-    setCompiled(true);
-    setCompiling(false);
     setRevoked(false);
     setSpent(STARTING_SPENT_KOBO);
     setPayments(DEMO_PAYMENTS);
+    setAgents(INITIAL_AGENTS);
     setLedger(DEMO_LEDGER);
     setFrames([]);
     setNotices([]);
-    setAttackSnippet(false);
     setBanner(null);
     select(null);
     setCompleted([1, 3, 4, 5]);
@@ -310,6 +364,9 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       spentKobo,
       payments,
       ledger,
+      agents,
+      addAgent,
+      toggleAgentStatus,
       frames,
       notices,
       attackSnippet,
@@ -334,6 +391,9 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       spentKobo,
       payments,
       ledger,
+      agents,
+      addAgent,
+      toggleAgentStatus,
       frames,
       notices,
       attackSnippet,

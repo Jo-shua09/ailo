@@ -222,9 +222,7 @@
 }
 
 /* Ailo customer experience */
-* {
-  box-shadow: none !important;
-}
+/* box-shadow enabled */
 h1,
 h2,
 h3,
@@ -456,3 +454,4 @@ h4 {
     scroll-behavior: auto !important;
   }
 }
+
