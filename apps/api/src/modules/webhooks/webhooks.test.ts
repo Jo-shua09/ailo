@@ -12,12 +12,15 @@ describe("WebhooksService", () => {
     service = new WebhooksService();
   });
 
-  it("verifies HMAC-SHA256 signature on raw body", () => {
-    const rawBody = JSON.stringify({ event: "charge.success", data: { reference: "AL-pay_01" } });
-    const validSignature = createHmac("sha256", secretKey).update(rawBody).digest("hex");
+  it("verifies Kora's signature: HMAC-SHA256 of JSON.stringify(body.data), not the whole body", () => {
+    const body = { event: "transfer.success", data: { reference: "AL-pay_01", status: "success" } };
+    const koraSignature = createHmac("sha256", secretKey).update(JSON.stringify(body.data)).digest("hex");
+    const wholeBodySignature = createHmac("sha256", secretKey).update(JSON.stringify(body)).digest("hex");
 
-    expect(service.verifySignature(rawBody, validSignature, secretKey)).toBe(true);
-    expect(service.verifySignature(rawBody, "invalid_sig", secretKey)).toBe(false);
+    expect(service.verifySignature(body.data, koraSignature, secretKey)).toBe(true);
+    expect(service.verifySignature(body.data, wholeBodySignature, secretKey)).toBe(false);
+    expect(service.verifySignature(body.data, "invalid_sig", secretKey)).toBe(false);
+    expect(service.verifySignature(body.data, "", secretKey)).toBe(false);
   });
 
   it("deduplicates multiple deliveries of the same webhook event", async () => {

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../../config/env";
 import { AppError } from "../../shared/AppError";
 import { eventsService } from "../events/events.service";
@@ -11,12 +11,13 @@ import type { KoraWebhookPayload } from "./webhooks.dto";
 export class WebhooksService {
   constructor(private repo: WebhooksRepository = webhooksRepository) {}
 
-  verifySignature(rawBody: string | Buffer, signature: string, secret = env.KORA_SECRET_KEY): boolean {
+  /** Kora signs HMAC-SHA256(JSON.stringify(body.data)) with the secret key, hex (Kora webhook docs). */
+  verifySignature(data: unknown, signature: string, secret = env.KORA_SECRET_KEY): boolean {
     if (!signature || !secret) return false;
-    const computed = createHmac("sha256", secret)
-      .update(rawBody)
-      .digest("hex");
-    return computed.toLowerCase() === signature.toLowerCase();
+    const computed = Buffer.from(createHmac("sha256", secret).update(JSON.stringify(data)).digest("hex"));
+    const received = Buffer.from(signature.toLowerCase());
+    // Constant-time: this compares a secret-derived value, so timing must not leak how much matched.
+    return computed.length === received.length && timingSafeEqual(computed, received);
   }
 
   async processWebhook(payload: KoraWebhookPayload): Promise<{ status: "processed" | "deduplicated" }> {

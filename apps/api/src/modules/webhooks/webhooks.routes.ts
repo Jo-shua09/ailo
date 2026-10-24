@@ -9,9 +9,7 @@ const router = Router();
 router.post("/webhooks/kora", validate({ body: KoraWebhookPayload }), async (req, res, next) => {
   try {
     const signature = req.headers["x-korapay-signature"] as string;
-    const rawBody = (req as any).rawBody ?? JSON.stringify(req.body);
-
-    const isValid = webhooksService.verifySignature(rawBody, signature);
+    const isValid = webhooksService.verifySignature((req.body as KoraWebhookPayload).data, signature);
     if (!isValid) {
       throw new AppError(401, "INVALID_WEBHOOK_SIGNATURE", "Webhook HMAC signature verification failed");
     }
