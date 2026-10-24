@@ -122,3 +122,25 @@ describe("mandates routes", () => {
     });
   });
 });
+
+describe("compile: shops when the rule names none", () => {
+  it("allows the shops in the payee directory, visibly, so the owner sees them before saving", async () => {
+    const proposed = {
+      allowed_categories: ["stock"], allowed_payees: [],
+      spending_limits: [{ amount_kobo: 5_000_000, interval: "weekly" }],
+      nod_above_kobo: 1_000_000, nod_rolling_payee_24h_kobo: 1_000_000, expires_at: "2026-11-24T00:00:00Z",
+    };
+    const policy = await compile("Spend N50,000 a week on stock. Ask me above N10,000.", { generatePolicy: async () => proposed });
+    expect(policy.allowed_payees).toEqual(["payee_mama_ngozi", "payee_lagos_logistics"]);
+  });
+
+  it("keeps the owner's named shops untouched", async () => {
+    const proposed = {
+      allowed_categories: ["stock"], allowed_payees: ["payee_mama_ngozi"],
+      spending_limits: [{ amount_kobo: 5_000_000, interval: "weekly" }],
+      nod_above_kobo: 1_000_000, nod_rolling_payee_24h_kobo: 1_000_000, expires_at: "2026-11-24T00:00:00Z",
+    };
+    const policy = await compile("Only Mama Ngozi.", { generatePolicy: async () => proposed });
+    expect(policy.allowed_payees).toEqual(["payee_mama_ngozi"]);
+  });
+});
