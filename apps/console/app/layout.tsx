@@ -21,14 +21,14 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Ailo — An allowance for your AI",
+  title: "Ailo - An allowance for your AI",
   description: "Let your AI handle everyday purchases while you stay in control of every naira.",
   icons: {
     icon: "/favicon.ico",
   },
   openGraph: {
     type: "website",
-    title: "Ailo — An allowance for your AI",
+    title: "Ailo - An allowance for your AI",
     description: "Let your AI handle everyday purchases while you stay in control of every naira.",
   },
   twitter: {
