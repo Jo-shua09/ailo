@@ -13,7 +13,7 @@ import { compile, test as testPolicy } from "./mandates.service";
 
 const policy: SpendPolicy = {
   allowed_categories: ["groceries"],
-  allowed_payees: ["pay_shoprite"],
+  allowed_payees: ["payee_mama_ngozi"],
   spending_limits: [{ amount_kobo: 1_000_000, interval: "daily" }],
   nod_above_kobo: 800_000,
   nod_rolling_payee_24h_kobo: 900_000,
@@ -21,7 +21,7 @@ const policy: SpendPolicy = {
 };
 
 const payment = (id: string, amount_kobo: number, created_at: string, over: Partial<Payment> = {}): Payment => ({
-  id, agent_id: "agt_1", payee_id: "pay_shoprite", payee_name: "Shoprite", amount_kobo, category: "groceries",
+  id, agent_id: "agt_1", payee_id: "payee_mama_ngozi", payee_name: "Shoprite", amount_kobo, category: "groceries",
   reason: "rice", verdict: "allow", decided_by: "rules", status: "settled", kora_reference: null,
   created_at, ...over,
 });
@@ -141,6 +141,16 @@ describe("compile: shops when the rule names none", () => {
       nod_above_kobo: 1_000_000, nod_rolling_payee_24h_kobo: 1_000_000, expires_at: "2026-11-24T00:00:00Z",
     };
     const policy = await compile("Only Mama Ngozi.", { generatePolicy: async () => proposed });
+    expect(policy.allowed_payees).toEqual(["payee_mama_ngozi"]);
+  });
+
+  it("drops shop names the model wrote instead of payee ids", async () => {
+    const proposed = {
+      allowed_categories: ["groceries"], allowed_payees: ["Mama Samuel", "payee_mama_ngozi"],
+      spending_limits: [{ amount_kobo: 2_000_000, interval: "per_payment" }],
+      nod_above_kobo: 1_000_000, nod_rolling_payee_24h_kobo: 1_000_000, expires_at: "2026-11-24T00:00:00Z",
+    };
+    const policy = await compile("Groceries from Mama Samuel.", { generatePolicy: async () => proposed });
     expect(policy.allowed_payees).toEqual(["payee_mama_ngozi"]);
   });
 });

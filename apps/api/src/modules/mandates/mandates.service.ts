@@ -18,8 +18,11 @@ export async function compile(english: string, deps: { generatePolicy: GenerateP
   }
   // A rule naming no shops means "my usual shops" (owner's decision, 24 Oct): fill them in here so the
   // owner sees the list in the compiled rule before saving, instead of every payment needing a Nod.
-  if (parsed.data.allowed_payees.length === 0) return { ...parsed.data, allowed_payees: listPayeeIds() };
-  return parsed.data;
+  // The model sometimes writes a shop's name ("Mama Samuel") instead of an id; an unknown entry would send
+  // every payment to Nod, so only ids in the payee directory are kept.
+  const known = listPayeeIds();
+  const payees = parsed.data.allowed_payees.filter((id) => known.includes(id));
+  return { ...parsed.data, allowed_payees: payees.length ? payees : known };
 }
 
 const DAY_MS = 24 * 3600 * 1000;
