@@ -61,3 +61,15 @@ describe("KoraRail.payout", () => {
     expect(body.destination.customer.email).toBe("x@example.com");
   });
 });
+
+describe("KoraRail.payout email", () => {
+  it("refuses a payout with no customer email instead of inventing one (Kora rejects fake domains)", async () => {
+    const fetchMock = stubFetch(200, {});
+    const result = await rail.payout({
+      payment_id: "pay_2", reference: "AL-pay_2", amount_kobo: 100_000, payee_id: "payee_x", payee_name: "X",
+      destination_bank_code: "033", destination_account_number: "0000000000",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: "failed", error: expect.stringContaining("email") });
+  });
+});

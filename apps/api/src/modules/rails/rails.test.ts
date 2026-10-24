@@ -72,6 +72,7 @@ describe("KoraRail", () => {
         payee_name: "Mama Ngozi Stores",
         destination_bank_code: "033",
         destination_account_number: "0000000000",
+        payee_email: "johndoe@korapay.com",
       });
 
       expect(queryCalled).toBe(true);

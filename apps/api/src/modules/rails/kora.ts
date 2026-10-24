@@ -27,6 +27,10 @@ export class KoraRail implements PayoutRail {
     if (!params.destination_bank_code || !params.destination_account_number) {
       return { reference: params.reference, status: "failed", error: `No payout account on file for ${params.payee_id}` };
     }
+    // Kora requires a real customer email and rejects made-up domains, so never invent one.
+    if (!params.payee_email) {
+      return { reference: params.reference, status: "failed", error: `No email on file for ${params.payee_id}` };
+    }
     const notificationUrl = `${env.PUBLIC_BASE_URL}${env.KORA_WEBHOOK_PATH}`;
     const amountNaira = (params.amount_kobo / 100).toFixed(2);
 
@@ -50,7 +54,7 @@ export class KoraRail implements PayoutRail {
         },
         customer: {
           name: params.payee_name,
-          email: params.payee_email ?? `${params.payee_id.replace(/[^a-zA-Z0-9]/g, "") || "payee"}@ailo.internal`,
+          email: params.payee_email,
         },
       },
       metadata,
