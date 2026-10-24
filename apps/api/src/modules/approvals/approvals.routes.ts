@@ -16,7 +16,7 @@ router.get("/approvals", async (_req, res, next) => {
 
 router.get("/approvals/:id", async (req, res, next) => {
   try {
-    const approval = await approvalsService.getApproval(req.params.id);
+    const approval = await approvalsService.getApproval(req.params.id as string);
     res.json(approval);
   } catch (err) {
     next(err);
