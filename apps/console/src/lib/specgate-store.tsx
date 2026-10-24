@@ -132,12 +132,14 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
     setLoadError(null);
     try {
       const [paymentData, approvalData, agentData, balanceData] = await Promise.all([
-        ownerFetch<{ payments: Record<string, unknown>[] }>("/v1/payments"),
-        ownerFetch<{ approvals: typeof approvals }>("/v1/approvals"),
-        ownerFetch<{ agents: Record<string, unknown>[] }>("/v1/agents"),
+        ownerFetch<{ payments?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/payments"),
+        ownerFetch<{ approvals?: typeof approvals } | typeof approvals>("/v1/approvals"),
+        ownerFetch<{ agents?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/agents"),
         ownerFetch<Record<string, number>>("/v1/ledger/balances"),
       ]);
-      setPayments((paymentData.payments || []).map((p) => ({
+
+      const rawPayments = Array.isArray(paymentData) ? paymentData : (paymentData.payments || []);
+      setPayments(rawPayments.map((p) => ({
         id: String(p.id), step: 0, label: String(p.narration || p.reason || "Payment"),
         payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0), amountKobo: Number(p.amount_kobo || 0),
         category: String(p.category || ""), reason: String(p.reason || p.narration || ""), idem: String(p.idempotency_key || ""),
@@ -146,13 +148,19 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
         code: p.reason_code as string | undefined, koraRef: p.kora_reference as string | undefined, replays: 0,
         createdAt: Date.parse(String(p.created_at || "")) || Date.now(),
       })));
-      setApprovals(approvalData.approvals || []);
-      setAgents((agentData.agents || []).map((a) => ({
+
+      const rawApprovals = Array.isArray(approvalData) ? approvalData : (approvalData.approvals || []);
+      setApprovals(rawApprovals);
+
+      const rawAgents = Array.isArray(agentData) ? agentData : (agentData.agents || []);
+      setAgents(rawAgents.map((a) => ({
         id: String(a.id), name: String(a.name || "Agent"), role: "AI agent", avatar: "/images/shop-agent.jpg",
         status: a.status === "active" ? "active" : "paused", spentThisWeek: "", allowanceKobo: Number((a.rules as Record<string, unknown> | undefined)?.max_amount_kobo || 0),
         thresholdKobo: 0, description: "Registered agent",
       })));
-      setBalance(Number(balanceData.available_balance_kobo || 0));
+
+      const avail = balanceData.available_balance ?? balanceData.available_balance_kobo ?? balanceData.owner_wallet ?? 0;
+      setBalance(Number(avail));
       setLedger([]);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load account data.");

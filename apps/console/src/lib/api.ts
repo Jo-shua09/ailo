@@ -1,5 +1,8 @@
 
-export const API = "http://localhost:4000";
+export const API =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
+    : "https://ailo-dx6f.onrender.com");
 
 const TOKEN_KEY = "ailo_owner_token";
 
