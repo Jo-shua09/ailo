@@ -45,6 +45,20 @@ export type Payment = {
   createdAt: number;
 };
 
+type ApprovalRecord = { id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string };
+
+/** One row per actionable approval or pending payment awaiting its approval record. */
+export function getPendingApprovalItems(approvals: ApprovalRecord[], payments: Payment[]) {
+  const pending = approvals
+    .filter((approval) => ["pending", "pending_approval"].includes(String(approval.status || "pending").toLowerCase()))
+    .map((approval) => ({ approval, payment: payments.find((payment) => payment.id === approval.payment_id) }));
+  const representedPaymentIds = new Set(pending.map(({ approval }) => approval.payment_id));
+  const missingApprovalPayments = payments
+    .filter((payment) => payment.status === "pending_approval" && !representedPaymentIds.has(payment.id))
+    .map((payment) => ({ approval: null, payment }));
+  return [...pending, ...missingApprovalPayments];
+}
+
 export type Check = { step: string; result: "pass" | "fail" | "skipped"; detail?: string };
 
 /** Spec Gate policy, as the API stores it (amounts in kobo). */
@@ -94,10 +108,11 @@ type Store = {
   setEnglishRule: (s: string) => void;
   spentKobo: number;
   payments: Payment[];
-  approvals: { id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[];
+  approvals: ApprovalRecord[];
   balance: number;
   loading: boolean;
   loadError: string | null;
+  approvalsLoadError: string | null;
   reload: () => Promise<void>;
   rule: SavedRule | null;
   compileRule: (english: string) => Promise<SpendPolicy>;
@@ -153,80 +168,163 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [approvals, setApprovals] = useState<{ id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[]>([]);
+  const [approvals, setApprovals] = useState<ApprovalRecord[]>([]);
   const [balance, setBalance] = useState(0);
   const [rule, setRule] = useState<SavedRule | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [approvalsLoadError, setApprovalsLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
+  const reloadQueuedRef = useRef(false);
 
   const reload = useCallback(async () => {
-    if (!getToken() || loadingRef.current) return;
+    if (!getToken()) return;
+    if (loadingRef.current) {
+      reloadQueuedRef.current = true;
+      return;
+    }
     loadingRef.current = true;
     setLoading(true);
     setLoadError(null);
     try {
-      const [paymentData, approvalData, agentData, balanceData, ruleData] = await Promise.all([
+      const [paymentResult, approvalResult, agentResult, balanceResult, ruleResult] = await Promise.allSettled([
         ownerFetch<{ payments?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/payments"),
         ownerFetch<{ approvals?: typeof approvals } | typeof approvals>("/v1/approvals"),
         ownerFetch<{ agents?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/agents"),
         ownerFetch<Record<string, number>>("/v1/ledger/balances"),
-        ownerFetch<SavedRule[]>("/v1/mandates"), // newest first
+        ownerFetch<SavedRule[] | { mandates?: SavedRule[] }>("/v1/mandates"),
       ]);
-      const latestRule = ruleData[0] ?? null;
-      setRule(latestRule);
+      const failures: string[] = [];
+      const errorText = (reason: unknown) => reason instanceof Error ? reason.message : "Request failed.";
 
-      const rawPayments = Array.isArray(paymentData) ? paymentData : (paymentData.payments || []);
-      const receipts = new Map<string, Check[]>();
-      await Promise.all(rawPayments.slice(0, 20).map(async (p) => {
-        const detail = await ownerFetch<{ receipt?: { checks?: Check[] } }>(`/v1/payments/${String(p.id)}`).catch(() => null);
-        if (detail?.receipt?.checks) receipts.set(String(p.id), detail.receipt.checks);
-      }));
-      setPayments(rawPayments.map((p) => ({
-        id: String(p.id), step: 0, label: String(p.narration || p.reason || "Payment"),
-        payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0), amountKobo: Number(p.amount_kobo || 0),
-        category: String(p.category || ""), reason: String(p.reason || p.narration || ""), idem: String(p.idempotency_key || ""),
-        status: p.status as PaymentStatus, ruleCheck: { pass: true, detail: String(p.rule_check?.toString() || "Server rules applied") },
-        aiVerdict: (p.second_look as Payment["aiVerdict"]) || { action: "ok", reason: "No Second Look detail" },
-        code: p.reason_code as string | undefined, koraRef: p.kora_reference as string | undefined, replays: 0,
-        createdAt: Date.parse(String(p.created_at || "")) || Date.now(),
-        ...(receipts.has(String(p.id)) ? { checks: receipts.get(String(p.id)), ...verdictsFrom(receipts.get(String(p.id))!, p.decided_by) } : {}),
-      })));
+      if (paymentResult.status === "fulfilled") {
+        const paymentData = paymentResult.value;
+        const rawPayments = Array.isArray(paymentData) ? paymentData : (paymentData.payments || []);
+        const receipts = new Map<string, Check[]>();
+        await Promise.all(rawPayments.slice(0, 20).map(async (payment) => {
+          const paymentId = String(payment.id);
+          const detail = await ownerFetch<{ receipt?: { checks?: Check[] } }>("/v1/payments/" + paymentId).catch(() => null);
+          if (detail?.receipt?.checks) receipts.set(paymentId, detail.receipt.checks);
+        }));
+        setPayments(rawPayments.map((payment) => {
+          const paymentId = String(payment.id);
+          const checks = receipts.get(paymentId);
+          return {
+            id: paymentId,
+            step: 0,
+            label: String(payment.narration || payment.reason || "Payment"),
+            payee: String(payment.payee_name || payment.payee_id || "Payee"),
+            amount_kobo: Number(payment.amount_kobo || 0),
+            amountKobo: Number(payment.amount_kobo || 0),
+            category: String(payment.category || ""),
+            reason: String(payment.reason || payment.narration || ""),
+            idem: String(payment.idempotency_key || ""),
+            status: payment.status as PaymentStatus,
+            ruleCheck: { pass: true, detail: String(payment.rule_check?.toString() || "Server rules applied") },
+            aiVerdict: (payment.second_look as Payment["aiVerdict"]) || { action: "ok", reason: "No Second Look detail" },
+            code: payment.reason_code as string | undefined,
+            koraRef: payment.kora_reference as string | undefined,
+            replays: 0,
+            createdAt: Date.parse(String(payment.created_at || "")) || Date.now(),
+            ...(checks ? { checks, ...verdictsFrom(checks, payment.decided_by) } : {}),
+          };
+        }));
+      } else {
+        failures.push("Payments: " + errorText(paymentResult.reason));
+      }
 
-      const rawApprovals = Array.isArray(approvalData) ? approvalData : (approvalData.approvals || []);
-      setApprovals(rawApprovals);
+      if (approvalResult.status === "fulfilled") {
+        const approvalData = approvalResult.value;
+        const rawApprovals = Array.isArray(approvalData) ? approvalData : (approvalData.approvals || []);
+        setApprovals(rawApprovals);
+        setApprovalsLoadError(null);
+      } else {
+        const message = errorText(approvalResult.reason);
+        setApprovalsLoadError(message);
+        failures.push("Approvals: " + message);
+      }
 
-      const rawAgents = Array.isArray(agentData) ? agentData : (agentData.agents || []);
-      setAgents(rawAgents.map((a) => ({
-        id: String(a.id), name: String(a.name || "Agent"), role: "AI agent", avatar: "/images/shop-agent.jpg",
-        status: a.status === "active" ? "active" : "paused", spentThisWeek: "", allowanceKobo: limitOf(latestRule?.policy, "weekly") || limitOf(latestRule?.policy, "per_payment"),
-        thresholdKobo: latestRule?.policy.nod_above_kobo ?? 0, description: "Registered agent",
-      })));
+      if (agentResult.status === "fulfilled") {
+        const agentData = agentResult.value;
+        const rawAgents = Array.isArray(agentData) ? agentData : (agentData.agents || []);
+        setAgents(rawAgents.map((agent) => ({
+          id: String(agent.id),
+          name: String(agent.name || "Agent"),
+          role: "AI agent",
+          avatar: "/images/shop-agent.jpg",
+          status: agent.status === "active" ? "active" : "paused",
+          spentThisWeek: "",
+          allowanceKobo: Number((agent.rules as Record<string, unknown> | undefined)?.max_amount_kobo || 0),
+          thresholdKobo: 0,
+          description: "Registered agent",
+        })));
+      } else {
+        failures.push("Agents: " + errorText(agentResult.reason));
+      }
 
-      const avail = balanceData.available_balance ?? balanceData.available_balance_kobo ?? balanceData.owner_wallet ?? 0;
-      setBalance(Number(avail));
-      setLedger([]);
+      if (balanceResult.status === "fulfilled") {
+        const balanceData = balanceResult.value;
+        const available = balanceData.available_balance ?? balanceData.available_balance_kobo ?? balanceData.owner_wallet ?? 0;
+        setBalance(Number(available));
+        setLedger([]);
+      } else {
+        failures.push("Ledger: " + errorText(balanceResult.reason));
+      }
+
+      if (ruleResult.status === "fulfilled") {
+        const ruleData = ruleResult.value;
+        const rules = Array.isArray(ruleData) ? ruleData : (ruleData.mandates || []);
+        setRule(rules[0] ?? null);
+      } else {
+        failures.push("Rules: " + errorText(ruleResult.reason));
+      }
+
+      setLoadError(failures.length ? failures.join(" ") : null);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Could not load account data.");
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (reloadQueuedRef.current) {
+        reloadQueuedRef.current = false;
+        queueMicrotask(() => void reload());
+      }
     }
   }, []);
 
   useEffect(() => {
     let events: EventSource | undefined;
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void reload();
+    };
     const connect = () => {
       events?.close();
+      if (poll) clearInterval(poll);
       const token = getToken();
       if (!token) return;
       void reload();
       events = new EventSource(`${API}/v1/events?access_token=${encodeURIComponent(token)}`);
-      events.onmessage = () => void reload();
+      const refresh = () => void reload();
+      events.onmessage = refresh;
+      // The server may emit typed SSE events, which do not trigger onmessage.
+      for (const eventName of ["payment_created", "payment_updated", "approval_updated", "ledger_updated"]) {
+        events.addEventListener(eventName, refresh);
+      }
+      // Keep the dashboard current if the stream is unavailable or an event is missed.
+      poll = setInterval(refreshIfVisible, 30_000);
     };
     window.addEventListener("ailo:session", connect);
+    window.addEventListener("focus", refreshIfVisible);
+    document.addEventListener("visibilitychange", refreshIfVisible);
     connect();
-    return () => { window.removeEventListener("ailo:session", connect); events?.close(); };
+    return () => {
+      window.removeEventListener("ailo:session", connect);
+      window.removeEventListener("focus", refreshIfVisible);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      if (poll) clearInterval(poll);
+      events?.close();
+    };
   }, [reload]);
   const [frames, setFrames] = useState<ProtoFrame[]>([]);
   const [notices, setNotices] = useState<PhoneNotice[]>([]);
@@ -360,6 +458,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       balance,
       loading,
       loadError,
+      approvalsLoadError,
       reload,
       rule,
       compileRule,
@@ -396,6 +495,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       balance,
       loading,
       loadError,
+      approvalsLoadError,
       reload,
       rule,
       compileRule,

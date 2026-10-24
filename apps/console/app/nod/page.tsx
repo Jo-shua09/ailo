@@ -1,3 +1,5 @@
+export const instant = false;
+
 import type { Metadata } from "next";
 import { ApprovalsView } from "@/src/components/dashboard/ApprovalsView";
 

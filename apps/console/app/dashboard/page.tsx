@@ -1,3 +1,5 @@
+export const instant = false;
+
 import type { Metadata } from "next";
 import { DashboardOverview } from "@/src/components/dashboard/DashboardOverview";
 

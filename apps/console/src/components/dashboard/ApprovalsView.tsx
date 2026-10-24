@@ -8,7 +8,7 @@ import { Button } from "@/src/components/ui/button";
 import { DataStatus } from "./DataStatus";
 
 export function ApprovalsView() {
-  const { approvals, payments, approve, deny, revoked, loading, loadError, reload } = useSpecGate();
+  const { approvals, payments, approve, deny, revoked, loading, loadError, approvalsLoadError, reload } = useSpecGate();
 
   useEffect(() => {
     void reload();
@@ -41,7 +41,7 @@ export function ApprovalsView() {
 
       <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
 
-      {loading || loadError ? null : pendingRequests.length === 0 ? (
+      {loading || approvalsLoadError ? null : pendingRequests.length === 0 ? (
         <div className="rounded-2xl bg-white p-12 text-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-4">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
             <CheckCircle2 className="h-7 w-7" />

@@ -1,3 +1,5 @@
+export const instant = false;
+
 import type { Metadata } from "next";
 import { SettingsView } from "@/src/components/dashboard/SettingsView";
 

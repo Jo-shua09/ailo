@@ -1,3 +1,5 @@
+export const instant = false;
+
 import type { Metadata } from "next";
 import { AgentIdentityView } from "@/src/components/dashboard/AgentIdentityView";
 
