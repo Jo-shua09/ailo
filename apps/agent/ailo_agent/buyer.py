@@ -34,6 +34,7 @@ class Deps:
     baseline: bool = False  # no Ailo: record pay attempts, send nothing
     attempts: list[dict] = field(default_factory=list)
     results: list[dict] = field(default_factory=list)
+    last_page: str | None = None  # raw text of the page read most recently, sent with the next payment
 
 
 def get_mandate(ctx: RunContext[Deps]) -> dict:
@@ -48,7 +49,9 @@ def read_shop_page(ctx: RunContext[Deps], url: str) -> str:
     if url not in ctx.deps.pages:
         return f"refused: {url} is not one of the given shop pages {list(ctx.deps.pages)}"
     text = ctx.deps.pages[url]
-    return tools.read_shop_page(url) if text is None else tools.wrap_untrusted(text)
+    wrapped = tools.read_shop_page(url) if text is None else tools.wrap_untrusted(text)
+    ctx.deps.last_page = wrapped.removeprefix(tools.UNTRUSTED_START + "\n").removesuffix("\n" + tools.UNTRUSTED_END)
+    return wrapped
 
 
 def pay(ctx: RunContext[Deps], payee_id: str, amount_kobo: int, category: str, reason: str) -> dict:
@@ -59,7 +62,7 @@ def pay(ctx: RunContext[Deps], payee_id: str, amount_kobo: int, category: str, r
     # Enforced in code, not just asked of the model: after a block or Brake, nothing more is sent.
     if any(r["status"] in ("blocked", "stopped") for r in ctx.deps.results):
         return {"status": "refused", "message": "an earlier payment was blocked or stopped; stop and report"}
-    res = tools.pay(ctx.deps.client, payee_id, amount_kobo, category, reason)
+    res = tools.pay(ctx.deps.client, payee_id, amount_kobo, category, reason, page_text=ctx.deps.last_page)
     ctx.deps.results.append(res)
     return res
 

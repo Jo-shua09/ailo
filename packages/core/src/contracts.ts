@@ -12,6 +12,8 @@ export const PaymentRequest = z.object({
   amount_kobo: kobo,
   category: z.string().min(1),
   reason: z.string().min(1).max(500),
+  /** Optional: the page the agent acted on, so Second Look can spot a poisoned page. Untrusted text. */
+  page_text: z.string().max(20_000).optional(),
 });
 export type PaymentRequest = z.infer<typeof PaymentRequest>;
 

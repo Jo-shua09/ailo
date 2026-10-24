@@ -21,8 +21,14 @@ def get_mandate(client: AiloClient) -> dict:
         return {"mandate": None, "note": "no mandate yet: the owner has not set spending rules, so do not pay"}
 
 
-def pay(client: AiloClient, payee_id: str, amount_kobo: int, category: str, reason: str) -> dict:
+PAGE_TEXT_MAX = 20_000  # the API's PaymentRequest cap
+
+
+def pay(client: AiloClient, payee_id: str, amount_kobo: int, category: str, reason: str, page_text: str | None = None) -> dict:
     body = {"payee_id": payee_id, "amount_kobo": amount_kobo, "category": category, "reason": reason}
+    if page_text:
+        # Lets Second Look see the page that drove this payment (a poisoned page is the attack).
+        body["page_text"] = page_text[:PAGE_TEXT_MAX]
     try:
         data = client.post("/v1/payments", body, idempotency_key=str(uuid.uuid4()))
     except AiloError as e:

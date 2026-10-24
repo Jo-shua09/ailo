@@ -48,3 +48,16 @@ describe("SecondLookResult", () => {
     expect(SecondLookResult.safeParse({ verdict: "escalate", reason: "item mismatch" }).success).toBe(true);
   });
 });
+
+describe("PaymentRequest page_text (for Second Look)", () => {
+  const ok = { payee_id: "payee_mama_ngozi", amount_kobo: 850000, category: "groceries", reason: "Restock rice" };
+
+  it("is optional, and carries the page the agent acted on when given", () => {
+    expect(PaymentRequest.safeParse(ok).success).toBe(true);
+    expect(PaymentRequest.parse({ ...ok, page_text: "Mama Gold Rice 50kg" }).page_text).toBe("Mama Gold Rice 50kg");
+  });
+
+  it("caps its size so a huge page cannot be sent to the model", () => {
+    expect(PaymentRequest.safeParse({ ...ok, page_text: "x".repeat(20_001) }).success).toBe(false);
+  });
+});

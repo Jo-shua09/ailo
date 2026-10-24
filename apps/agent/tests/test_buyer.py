@@ -91,3 +91,10 @@ def test_gemini_key_is_mapped(monkeypatch):
     buyer.map_gemini_key()
     import os
     assert os.environ["GOOGLE_API_KEY"] == "k"
+
+
+def test_the_page_the_agent_read_is_attached_to_its_payment():
+    sent = []
+    deps = buyer.Deps(client=client_for(lambda r: httpx.Response(201, json=SETTLED), sent), pages={PAGE: "Mama Gold Rice 50kg"})
+    buyer.run("buy rice", deps, model=scripted(("read_shop_page", {"url": PAGE}), PAY))
+    assert sent[0]["page_text"] == "Mama Gold Rice 50kg"  # raw page, without the untrusted markers
