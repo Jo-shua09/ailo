@@ -13,7 +13,7 @@ export default defineConfig({
       KORA_SECRET_KEY: "test_kora_secret_key",
       LLM_MODEL_FAST: "gemini-3.5-flash-lite",
       LLM_MODEL_SMART: "gemini-3.8-flash",
-      OWNER_PIN: "1234",
+      OWNER_PIN: "123456",
       SESSION_SECRET: "1234567890123456",
       CONSOLE_ORIGIN: "http://localhost:3000",
     },

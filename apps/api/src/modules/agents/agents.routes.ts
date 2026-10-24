@@ -58,9 +58,11 @@ export function agentsRouter(deps?: { agents?: AgentRepository; ownerAuth?: Requ
 
   router.get("/agents/:id", async (req, res, next) => {
     try {
-      const agent = deps?.agents
-        ? await deps.agents.get(req.params.id as string)
-        : await agentsService.getAgent(req.params.id as string);
+      const id = req.params.id as string;
+      let agent = deps?.agents ? await deps.agents.get(id) : undefined;
+      if (!agent) {
+        agent = await agentsService.getAgent(id).catch(() => undefined);
+      }
       if (!agent) throw new AppError(404, "NOT_FOUND", "No such agent");
       res.json(agent);
     } catch (err) {
@@ -69,14 +71,17 @@ export function agentsRouter(deps?: { agents?: AgentRepository; ownerAuth?: Requ
   });
 
   // Brake kill switch endpoint
-  router.post("/agents/:id/brake", async (req, res, next) => {
+  router.post("/agents/:id/brake", auth, async (req, res, next) => {
     try {
+      const id = req.params.id as string;
       if (deps?.agents) {
-        const agent = await deps.agents.setStatus(req.params.id as string, "revoked");
-        if (!agent) throw new AppError(404, "NOT_FOUND", "No such agent");
-        return res.json({ status: "revoked", agent: view(agent) });
+        const agent = await deps.agents.setStatus(id, "revoked");
+        if (agent) {
+          await agentsService.revokeAgent(id).catch(() => {});
+          return res.json({ status: "revoked", agent: view(agent) });
+        }
       }
-      const revoked = await agentsService.revokeAgent(req.params.id as string);
+      const revoked = await agentsService.revokeAgent(id);
       res.json({ status: "revoked", agent: revoked });
     } catch (err) {
       next(err);
@@ -84,7 +89,7 @@ export function agentsRouter(deps?: { agents?: AgentRepository; ownerAuth?: Requ
   });
 
   // Alias for PRD section 9 mandate kill switch
-  router.post("/mandates/:id/brake", async (req, res, next) => {
+  router.post("/mandates/:id/brake", auth, async (req, res, next) => {
     try {
       const revoked = await agentsService.revokeAgent(req.params.id as string);
       res.json({ status: "revoked", agent: revoked });

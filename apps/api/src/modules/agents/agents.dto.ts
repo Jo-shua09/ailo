@@ -39,7 +39,9 @@ export type AgentBadge = z.infer<typeof AgentBadgeSchema>;
 export interface Agent {
   id: string;
   name: string;
-  public_jwk: any;
+  public_jwk?: any;
+  public_key_jwk?: any;
+  key_fingerprint?: string;
   status: AgentStatus;
   created_at: string;
 }

@@ -11,12 +11,28 @@ import type { KoraWebhookPayload } from "./webhooks.dto";
 export class WebhooksService {
   constructor(private repo: WebhooksRepository = webhooksRepository) {}
 
-  verifySignature(rawBody: string | Buffer, signature: string, secret = env.KORA_SECRET_KEY): boolean {
+  verifySignature(
+    rawBody: string | Buffer,
+    signature: string,
+    secret = env.KORA_SECRET_KEY,
+    dataObject?: unknown
+  ): boolean {
     if (!signature || !secret) return false;
-    const computed = createHmac("sha256", secret)
+    // 1. Raw body HMAC check (Ailo engine requirement)
+    const computedRaw = createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
-    return computed.toLowerCase() === signature.toLowerCase();
+    if (computedRaw.toLowerCase() === signature.toLowerCase()) return true;
+
+    // 2. Data object HMAC check (Kora official documentation specification)
+    if (dataObject !== undefined) {
+      const computedData = createHmac("sha256", secret)
+        .update(JSON.stringify(dataObject))
+        .digest("hex");
+      if (computedData.toLowerCase() === signature.toLowerCase()) return true;
+    }
+
+    return false;
   }
 
   async processWebhook(payload: KoraWebhookPayload): Promise<{ status: "processed" | "deduplicated" }> {

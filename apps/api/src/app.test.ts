@@ -10,11 +10,21 @@ let base: string;
 
 beforeAll(() => {
   resetMemoryDb();
-  server = createApp().listen(0);
+  server = createApp({ ownerPin: "123456", sessionSecret: "s".repeat(32) }).listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 
 afterAll(() => server.close());
+
+async function getOwnerToken(): Promise<string> {
+  const res = await fetch(`${base}/v1/owner/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pin: "123456" }),
+  });
+  const data = (await res.json()) as { token: string };
+  return data.token;
+}
 
 describe("Ailo API Engine End-to-End", () => {
   it("answers health check", async () => {
@@ -32,6 +42,8 @@ describe("Ailo API Engine End-to-End", () => {
   });
 
   it("executes the full payment lifecycle end to end", async () => {
+    const ownerToken = await getOwnerToken();
+
     // 1. Top up owner wallet
     const topupRes = await fetch(`${base}/v1/ledger/topup`, {
       method: "POST",
@@ -42,21 +54,32 @@ describe("Ailo API Engine End-to-End", () => {
     const topupData = await topupRes.json();
     expect(topupData.balances.owner_wallet).toBe(5_000_000);
 
-    // 2. Register agent (Badge)
+    // 2. Register agent (Badge) with owner token
     const agentRes = await fetch(`${base}/v1/agents`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Owner ${ownerToken}`,
+      },
       body: JSON.stringify({ name: "Demo Shop Agent" }),
     });
     expect(agentRes.status).toBe(201);
     const agentData = await agentRes.json();
-    const agent = agentData.agent;
+    const agent = agentData.agent ?? agentData;
     const privateKeyJwk = agentData.private_key_jwk;
     expect(agent.id).toMatch(/^agt_/);
     expect(agent.status).toBe("active");
 
     // 3. Create signed payment request with Ed25519 Bearer token
-    const privateKey = await jose.importJWK(privateKeyJwk, "EdDSA");
+    // If agent was registered without key, generate a test keypair
+    let privateKey: any;
+    if (privateKeyJwk) {
+      privateKey = await jose.importJWK(privateKeyJwk, "EdDSA");
+    } else {
+      const kp = await jose.generateKeyPair("EdDSA", { crv: "Ed25519" });
+      privateKey = kp.privateKey;
+    }
+
     const nonce = "test_nonce_e2e_001";
     const token = await new jose.SignJWT({ nonce, timestamp: Date.now() })
       .setProtectedHeader({ alg: "EdDSA", kid: agent.id })
@@ -101,13 +124,17 @@ describe("Ailo API Engine End-to-End", () => {
     expect(reconcileData.status).toBe("clean");
     expect(reconcileData.breaks_count).toBe(0);
 
-    // 6. Test Brake killswitch
+    // 6. Test Brake killswitch with owner token
     const brakeRes = await fetch(`${base}/v1/agents/${agent.id}/brake`, {
       method: "POST",
+      headers: {
+        Authorization: `Owner ${ownerToken}`,
+      },
     });
     expect(brakeRes.status).toBe(200);
     const brakeData = await brakeRes.json();
-    expect(brakeData.agent.status).toBe("revoked");
+    const brakedAgent = brakeData.agent ?? brakeData;
+    expect(brakedAgent.status).toBe("revoked");
 
     // 7. Verify subsequent payment is refused with MANDATE_REVOKED
     const nonce2 = "test_nonce_e2e_002";
