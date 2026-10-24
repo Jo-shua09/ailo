@@ -176,6 +176,8 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [approvalsLoadError, setApprovalsLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
   const reloadQueuedRef = useRef(false);
+  // reload re-runs itself when an update arrived mid-load; going through a ref keeps it memoizable.
+  const reloadRef = useRef<() => Promise<void>>(async () => {});
 
   const reload = useCallback(async () => {
     if (!getToken()) return;
@@ -287,10 +289,13 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       if (reloadQueuedRef.current) {
         reloadQueuedRef.current = false;
-        queueMicrotask(() => void reload());
+        queueMicrotask(() => void reloadRef.current());
       }
     }
   }, []);
+  useEffect(() => {
+    reloadRef.current = reload;
+  }, [reload]);
 
   useEffect(() => {
     let events: EventSource | undefined;
