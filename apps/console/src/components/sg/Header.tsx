@@ -57,7 +57,7 @@ export function Header() {
             How it works
           </Link>
           <Link href="/security" className={`text-sm font-medium ${pathname === "/security" ? "text-primary" : ""}`}>
-            Your money, protected
+            Security
           </Link>
           <Link href="/shop" className={`text-sm font-medium ${pathname === "/shop" ? "text-primary" : ""}`}>
             Demo shop

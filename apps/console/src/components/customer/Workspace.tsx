@@ -71,7 +71,7 @@ export function Receipt({ payment, onClose }: { payment: Payment; onClose: () =>
           </Button>
         </div>
         <p className="mt-7 text-sm text-muted-foreground">{payment.payee}</p>
-        <h2 className="my-3 font-mono text-4xl font-semibold">{naira(payment.amountKobo)}</h2>
+        <h2 className="my-3 font-mono text-4xl font-semibold">{naira(payment.amount_kobo)}</h2>
         <Status payment={payment} />
         <div className="mt-6 border-y border-border py-4">
           <p className="text-xs text-muted-foreground">What your assistant asked for</p>
@@ -156,7 +156,7 @@ export function Activity({ limit }: { limit?: number }) {
               <p className="mt-1 text-xs text-muted-foreground">{p.payee}</p>
             </div>
             <span className="payment-agent text-xs text-muted-foreground">Shop assistant</span>
-            <span className="font-mono text-sm font-medium">{naira(p.amountKobo)}</span>
+            <span className="font-mono text-sm font-medium">{naira(p.amount_kobo)}</span>
             <span className="payment-status">
               <Status payment={p} />
             </span>
@@ -200,7 +200,7 @@ export function Dashboard() {
             <div>
               <p className="font-medium">Your assistant needs a nod.</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {naira(pending[0]?.amountKobo ?? 0)} for {pending[0]?.label.toLowerCase()} is above your approval limit.
+                {naira(pending[0]?.amount_kobo ?? 0)} for {pending[0]?.label.toLowerCase()} is above your approval limit.
               </p>
             </div>
           </div>
@@ -470,7 +470,7 @@ export function Approvals() {
                 <Status payment={p} />
               </div>
               <p className="mt-7 text-sm text-muted-foreground">Paying {p.payee}</p>
-              <h2 className="my-4 font-mono text-4xl font-semibold">{naira(p.amountKobo)}</h2>
+              <h2 className="my-4 font-mono text-4xl font-semibold">{naira(p.amount_kobo)}</h2>
               <p className="text-lg font-medium">{p.label}</p>
               <div className="my-6 border-l-2 border-warning bg-warning-soft p-4 text-sm text-warning">
                 Above your ₦10,000 approval limit. Your nod is needed.
@@ -487,7 +487,7 @@ export function Approvals() {
                     disabled={sg.revoked}
                     onClick={() => sg.approve(p.id)}
                   >
-                    <Check /> Approve {naira(p.amountKobo)}
+                    <Check /> Approve {naira(p.amount_kobo)}
                   </Button>
                   <Button size="lg" variant="outline" className="border-destructive text-destructive" onClick={() => sg.deny(p.id)}>
                     <X /> Deny purchase
@@ -518,7 +518,7 @@ export function Payments() {
   const [checking, setChecking] = useState(false);
   const [checked, setChecked] = useState(false);
   const [filter, setFilter] = useState("All payments");
-  const total = sg.payments.filter((p) => p.status === "settled").reduce((sum, p) => sum + p.amountKobo, 0);
+  const total = sg.payments.filter((p) => p.status === "settled").reduce((sum, p) => sum + p.amount_kobo, 0);
   return (
     <div className="customer-app">
       <AppIntro title="Every naira, accounted for." description="A clear record of your assistant’s purchases and payment confirmations." />
@@ -589,7 +589,7 @@ function FilteredPayment({ payment }: { payment: Payment }) {
     <>
       <Button variant="outline" className="h-auto w-full flex-wrap justify-between rounded-md p-5" onClick={() => setOpen(true)}>
         <span>{payment.label}</span>
-        <span className="font-mono">{naira(payment.amountKobo)}</span>
+        <span className="font-mono">{naira(payment.amount_kobo)}</span>
         <Status payment={payment} />
       </Button>
       {open && <Receipt payment={payment} onClose={() => setOpen(false)} />}

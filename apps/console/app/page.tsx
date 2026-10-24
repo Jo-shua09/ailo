@@ -71,7 +71,7 @@ export default function LandingPage() {
         </div>
       </section>
       <div className="border-b border-border bg-card">
-        <div className="site-container grid grid-cols-1 gap-4 py-6 text-sm font-medium sm:grid-cols-3">
+        <div className="site-container grid grid-cols-1 gap-4 py-5 text-sm font-medium sm:grid-cols-3 sm:py-6">
           {[
             [ShieldCheck, "Your bank details stay yours"],
             [SlidersHorizontal, "Spending limits you set"],
@@ -89,7 +89,7 @@ export default function LandingPage() {
       </div>
       <section className="marketing-section bg-card">
         <div className="site-container">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="mb-10 flex flex-col justify-between gap-5 sm:mb-12 md:flex-row md:items-end">
             <div>
               <p className="section-label mb-4">LESS BUSYWORK. MORE BUSINESS.</p>
               <h2 className="section-title">
@@ -136,7 +136,7 @@ export default function LandingPage() {
         </div>
       </section>
       <section className="marketing-section">
-        <div className="site-container grid items-center gap-16 lg:grid-cols-2">
+        <div className="site-container grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           <div>
             <p className="section-label mb-4">SIMPLE ENOUGH TO SAY OUT LOUD</p>
             <h2 className="section-title">
@@ -198,11 +198,11 @@ export default function LandingPage() {
               A smarter assistant.
               <br />A safer way to spend.
             </h2>
-            <p className="mt-5 text-muted-foreground">
+            <p className="mt-5 leading-relaxed text-muted-foreground">
               From the first request to the final receipt, you’re never left wondering where your money went.
             </p>
           </div>
-          <div className="grid gap-16 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
               [ShieldCheck, "A second look", "Unusual requests are checked against what you actually wanted to buy."],
               [Bell, "A nod from you", "Approve or deny larger purchases right from your phone."],
@@ -211,7 +211,7 @@ export default function LandingPage() {
             ].map(([Icon, title, desc]) => {
               const I = Icon as typeof ShieldCheck;
               return (
-                <div key={title as string} className="rounded-md border border-border p-6">
+                <div key={title as string} className="rounded-md border border-border p-6 sm:p-7">
                   <I className="mb-5 h-7 w-7 text-primary" />
                   <h3 className="mb-3 text-lg font-semibold">{title as string}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{desc as string}</p>
@@ -219,7 +219,7 @@ export default function LandingPage() {
               );
             })}
           </div>
-          <div className="mt-8 text-center">
+          <div className="mt-10 text-center">
             <Button asChild variant="outline" size="lg">
               <Link href="/security">
                 Get to know Ailo’s safety checks <ArrowRight />
@@ -229,7 +229,7 @@ export default function LandingPage() {
         </div>
       </section>
       <section className="marketing-section">
-        <div className="site-container grid items-center gap-12 md:grid-cols-2">
+        <div className="site-container grid items-center gap-8 md:grid-cols-2 md:gap-12">
           <div className="overflow-hidden rounded-md border border-border bg-card">
             <img
               src={groceriesImage.src}
@@ -279,7 +279,7 @@ export default function LandingPage() {
         </div>
       </section>
       <section className="marketing-section border-y border-border bg-card">
-        <div className="site-container grid gap-10 md:grid-cols-2">
+        <div className="site-container grid gap-8 md:grid-cols-2 md:gap-10 lg:gap-16">
           <div>
             <p className="section-label mb-4">A FEW GOOD QUESTIONS</p>
             <h2 className="section-title">

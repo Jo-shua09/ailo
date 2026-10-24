@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getToken } from "@/src/lib/api";
 
 import { Footer, Header } from "@/src/components/sg/Header";
 import { SpecGateProvider } from "@/src/lib/specgate-store";
@@ -11,10 +13,17 @@ const customerRoutes = ["/dashboard", "/agents", "/rules", "/nod", "/transaction
 
 function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
   const customerApp = customerRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  useEffect(() => {
+    const token = getToken();
+    setAuthenticated(Boolean(token));
+    if (customerApp && !token) router.replace("/login");
+  }, [customerApp, pathname, router]);
 
   if (customerApp) {
+    if (!authenticated) return null;
     return <DashboardLayout>{children}</DashboardLayout>;
   }
 

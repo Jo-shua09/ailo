@@ -37,8 +37,8 @@ export function Phone() {
                 <div className="text-xs font-semibold">
                   {pending.payee} <span className="text-primary">(KYA Verified)</span>
                 </div>
-                <div className="num mt-2 text-xl font-semibold">{naira(pending.amountKobo)}</div>
-                <div className="num text-[10px] text-dim">{kobo(pending.amountKobo)}</div>
+                <div className="num mt-2 text-xl font-semibold">{naira(pending.amount_kobo)}</div>
+                <div className="num text-[10px] text-dim">{kobo(pending.amount_kobo)}</div>
                 <div className="mt-2 text-[11px] italic text-muted-foreground">"{pending.reason}"</div>
                 <div className="num mt-2 text-[10px] text-warning">Escrow hold until delivery confirmed</div>
                 {isPending && (

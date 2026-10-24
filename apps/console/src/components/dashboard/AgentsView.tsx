@@ -6,9 +6,10 @@ import Link from "next/link";
 import { Plus, ChevronRight } from "lucide-react";
 import { useSpecGate, type Agent } from "@/src/lib/specgate-store";
 import { CreateAgentDialog } from "./CreateAgentDialog";
+import { DataStatus } from "./DataStatus";
 
 export function AgentsView() {
-  const { agents, revoked } = useSpecGate();
+  const { agents, revoked, loading, loadError, reload } = useSpecGate();
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -33,9 +34,11 @@ export function AgentsView() {
         </button>
       </div>
 
+      <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
+
       {/* Agents List (Full width stacked cards linking to Agent Identity) */}
       <div className="space-y-4">
-        {agents.map((agent) => {
+        {!loading && !loadError && agents.map((agent) => {
           const isActive = agent.status === "active" && !revoked;
 
           return (

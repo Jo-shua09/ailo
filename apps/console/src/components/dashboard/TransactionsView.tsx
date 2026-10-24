@@ -5,9 +5,10 @@ import { Check, X, ShieldCheck, Filter, FileText, ChevronRight } from "lucide-re
 import { useSpecGate, type Payment } from "@/src/lib/specgate-store";
 import { naira } from "@/src/lib/format";
 import { Button } from "@/src/components/ui/button";
+import { DataStatus } from "./DataStatus";
 
 export function TransactionsView() {
-  const { payments } = useSpecGate();
+  const { payments, loading, loadError, reload } = useSpecGate();
   const [filter, setFilter] = useState<"all" | "settled" | "pending" | "blocked">("all");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
@@ -62,9 +63,11 @@ export function TransactionsView() {
         </div>
       </div>
 
+      <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
+
       {/* Transactions List */}
       <div className="space-y-3">
-        {filtered.length === 0 ? (
+        {loading || loadError ? null : filtered.length === 0 ? (
           <div className="rounded-2xl bg-white p-12 text-center border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] text-slate-500 text-sm">
             No transactions matching this filter.
           </div>
@@ -104,7 +107,7 @@ export function TransactionsView() {
 
                 <div className="flex items-center justify-between sm:justify-end gap-5">
                   <p className="text-base font-extrabold text-slate-900">
-                    {naira(p.amountKobo)}
+                    {naira(p.amount_kobo)}
                   </p>
 
                   <span
@@ -152,7 +155,7 @@ export function TransactionsView() {
               <div className="text-center py-3 bg-slate-50 rounded-xl">
                 <p className="text-xs text-slate-500">{selectedPayment.payee}</p>
                 <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                  {naira(selectedPayment.amountKobo)}
+                  {naira(selectedPayment.amount_kobo)}
                 </p>
                 <p className="text-xs font-semibold text-emerald-600 mt-1 uppercase tracking-wider">
                   {selectedPayment.status}

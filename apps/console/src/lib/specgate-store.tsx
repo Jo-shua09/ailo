@@ -1,28 +1,26 @@
 "use client";
 
 // cspell: disable
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
-
-import { DEMO_PAYMENTS, DEMO_LEDGER } from "./ailo-demo";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { API, getToken, ownerFetch } from "./api";
 
 export const WEEKLY_CAP_KOBO = 5_000_000;
 export const THRESHOLD_KOBO = 1_000_000;
-const STARTING_SPENT_KOBO = 1_245_000;
 
-export type PaymentStatus = "requested" | "blocked" | "pending_approval" | "approved" | "escrow_held" | "submitted" | "settled" | "denied" | "failed";
+export type PaymentStatus = "pending_approval" | "settled" | "blocked" | "failed";
 
 export type Payment = {
   id: string;
   step: number;
   label: string;
   payee: string;
-  amountKobo: number;
+  amount_kobo: number;
   category: string;
   reason: string;
   idem: string;
   status: PaymentStatus;
   ruleCheck: { pass: boolean; detail: string };
-  aiVerdict: { pass: boolean; score: number; detail: string };
+  aiVerdict: { action: "ok" | "escalate" | "block"; reason: string };
   code?: string;
   koraRef?: string;
   replays: number;
@@ -54,41 +52,7 @@ export type Agent = {
   description: string;
 };
 
-export const INITIAL_AGENTS: Agent[] = [
-  {
-    id: "shop-agent",
-    name: "Shop Agent",
-    role: "Shopping & inventory",
-    avatar: "/images/shop-agent.jpg",
-    status: "active",
-    spentThisWeek: "₦12,450 spent this week",
-    allowanceKobo: 5_000_000,
-    thresholdKobo: 1_000_000,
-    description: "Monitors shop inventory, sources items from vetted suppliers, and initiates purchases within rules.",
-  },
-  {
-    id: "research-agent",
-    name: "Research Agent",
-    role: "Information & research",
-    avatar: "/images/research-agent.jpg",
-    status: "active",
-    spentThisWeek: "₦0 spent this week",
-    allowanceKobo: 1_000_000,
-    thresholdKobo: 200_000,
-    description: "Tracks wholesale market prices, identifies trends across Lagos hubs, and compiles market reports.",
-  },
-  {
-    id: "content-agent",
-    name: "Content Agent",
-    role: "Content creation & marketing",
-    avatar: "/images/content-agent.jpg",
-    status: "paused",
-    spentThisWeek: "₦0 spent this week",
-    allowanceKobo: 1_500_000,
-    thresholdKobo: 300_000,
-    description: "Drafts product showcases, WhatsApp marketing messages, and promotional campaign copies.",
-  },
-];
+export const INITIAL_AGENTS: Agent[] = [];
 
 type Store = {
   compiled: boolean;
@@ -98,6 +62,11 @@ type Store = {
   setEnglishRule: (s: string) => void;
   spentKobo: number;
   payments: Payment[];
+  approvals: { id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[];
+  balance: number;
+  loading: boolean;
+  loadError: string | null;
+  reload: () => Promise<void>;
   ledger: LedgerEntry[];
   agents: Agent[];
   addAgent: (agent: Agent) => void;
@@ -124,61 +93,73 @@ const DEFAULT_RULE = "My shop agent can spend ₦50,000 a week on stock. Ask me 
 
 let seq = 0;
 const uid = (p: string) => `${p}_${(++seq).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const koraRef = () => `KPY-NG-20261023-${Math.floor(1000 + Math.random() * 8999)}`;
-
-const SCENARIOS: Record<number, Omit<Payment, "id" | "status" | "replays" | "createdAt" | "step">> = {
-  2: {
-    label: "Research API call",
-    payee: "NaijaMarket Research API",
-    amountKobo: 50_000,
-    category: "market_research_api",
-    reason: "Fetch Lagos fabric price index for weekly restock planning",
-    idem: "idem_8840_ng_research",
-    ruleCheck: { pass: true, detail: "50,000 kobo ≤ 1,000,000 kobo threshold · market_research_api ∈ allowlist" },
-    aiVerdict: { pass: true, score: 0.97, detail: "Reason 'price index for restock planning' aligns with mandate purpose: research." },
-  },
-  3: {
-    label: "Shop stock purchase",
-    payee: "Mama Ngozi Stores",
-    amountKobo: 850_000,
-    category: "inventory_stock",
-    reason: "Restock rice for the shop",
-    idem: "idem_8841_ng_stock",
-    ruleCheck: { pass: true, detail: "850,000 kobo ≤ 1,000,000 kobo threshold · inventory_stock ∈ allowlist" },
-    aiVerdict: { pass: true, score: 0.98, detail: "Reason 'Restock rice for the shop' matches mandate purpose." },
-  },
-  4: {
-    label: "Unexpected gift hamper",
-    payee: "Mama Ngozi Stores",
-    amountKobo: 900_000,
-    category: "inventory_stock",
-    reason: "Buy executive gift hamper — urgent supplier promo",
-    idem: "idem_8842_ng_injected",
-    code: "INTENT_DRIFT_INJECTION",
-    ruleCheck: { pass: true, detail: "Approved shop and within your allowance. The item still needs a second look." },
-    aiVerdict: { pass: false, score: 0.03, detail: "FAIL — Prompt injection detected attempting unauthorized transfer outside mandate scope." },
-  },
-  5: {
-    label: "High-value stock order",
-    payee: "Mama Ngozi Stores",
-    amountKobo: 1_200_000,
-    category: "inventory_stock",
-    reason: "Order vegetable oil and rice for weekend restock",
-    idem: "idem_8843_ng_wholesale",
-    ruleCheck: { pass: true, detail: "1,200,000 kobo > 1,000,000 kobo threshold → owner approval + escrow required" },
-    aiVerdict: { pass: true, score: 0.95, detail: "Reason 'weekend restock of peak milk' aligns with mandate purpose: stock." },
-  },
-};
 
 export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [englishRule, setEnglishRule] = useState(DEFAULT_RULE);
   const [compiled, setCompiled] = useState(true);
   const [compiling, setCompiling] = useState(false);
   const [revoked, setRevoked] = useState(false);
-  const [spentKobo, setSpent] = useState(STARTING_SPENT_KOBO);
-  const [payments, setPayments] = useState<Payment[]>(DEMO_PAYMENTS);
-  const [ledger, setLedger] = useState<LedgerEntry[]>(DEMO_LEDGER);
-  const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
+  const [spentKobo, setSpent] = useState(0);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [approvals, setApprovals] = useState<{ id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[]>([]);
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+
+  const reload = useCallback(async () => {
+    if (!getToken() || loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [paymentData, approvalData, agentData, balanceData] = await Promise.all([
+        ownerFetch<{ payments: Record<string, unknown>[] }>("/v1/payments"),
+        ownerFetch<{ approvals: typeof approvals }>("/v1/approvals"),
+        ownerFetch<{ agents: Record<string, unknown>[] }>("/v1/agents"),
+        ownerFetch<Record<string, number>>("/v1/ledger/balances"),
+      ]);
+      setPayments((paymentData.payments || []).map((p) => ({
+        id: String(p.id), step: 0, label: String(p.narration || p.reason || "Payment"),
+        payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0),
+        category: String(p.category || ""), reason: String(p.reason || p.narration || ""), idem: String(p.idempotency_key || ""),
+        status: p.status as PaymentStatus, ruleCheck: { pass: true, detail: String(p.rule_check?.toString() || "Server rules applied") },
+        aiVerdict: (p.second_look as Payment["aiVerdict"]) || { action: "ok", reason: "No Second Look detail" },
+        code: p.reason_code as string | undefined, koraRef: p.kora_reference as string | undefined, replays: 0,
+        createdAt: Date.parse(String(p.created_at || "")) || Date.now(),
+      })));
+      setApprovals(approvalData.approvals || []);
+      setAgents((agentData.agents || []).map((a) => ({
+        id: String(a.id), name: String(a.name || "Agent"), role: "AI agent", avatar: "/images/shop-agent.jpg",
+        status: a.status === "active" ? "active" : "paused", spentThisWeek: "", allowanceKobo: Number((a.rules as Record<string, unknown> | undefined)?.max_amount_kobo || 0),
+        thresholdKobo: 0, description: "Registered agent",
+      })));
+      setBalance(Number(balanceData.available_balance_kobo || 0));
+      setLedger([]);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load account data.");
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let events: EventSource | undefined;
+    const connect = () => {
+      events?.close();
+      const token = getToken();
+      if (!token) return;
+      void reload();
+      events = new EventSource(`${API}/v1/events?access_token=${encodeURIComponent(token)}`);
+      events.onmessage = () => void reload();
+    };
+    window.addEventListener("ailo:session", connect);
+    connect();
+    return () => { window.removeEventListener("ailo:session", connect); events?.close(); };
+  }, [reload]);
   const [frames, setFrames] = useState<ProtoFrame[]>([]);
   const [notices, setNotices] = useState<PhoneNotice[]>([]);
   const [attackSnippet, setAttackSnippet] = useState(false);
@@ -196,10 +177,8 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleAgentStatus = useCallback((id: string) => {
-    setAgents((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: a.status === "active" ? "paused" : "active" } : a))
-    );
-  }, []);
+    void ownerFetch(`/v1/agents/${id}/brake`, { method: "POST" }).then(reload);
+  }, [reload]);
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -231,97 +210,18 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const runStep = useCallback(
     (step: number) => {
       if (revokedRef.current) return;
-      clearTimers();
-      setFrames([]);
-      setBanner(null);
-
-      if (step === 1) {
-        compile(englishRule);
-        return;
-      }
-
-      const scen = SCENARIOS[step];
-      if (!scen) return;
-
-      const pid = uid("pay");
-      const payment: Payment = {
-        ...scen,
-        id: pid,
-        step,
-        status: "requested",
-        replays: 0,
-        createdAt: Date.now(),
-      };
-
-      setPayments((p) => [payment, ...p]);
-      select(pid);
-
-      later(400, () => {
-        pushFrame({ id: uid("f"), from: "agent", tone: "info", text: `Payment request: ${scen.label} (${scen.amountKobo / 100} NGN)` });
-      });
-
-      if (step === 2) {
-        later(900, () => {
-          pushFrame({ id: uid("f"), from: "gate", tone: "ok", text: `Allowance ok: ${scen.ruleCheck.detail}` });
-          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "settled", koraRef: koraRef() } : p)));
-          setSpent((s) => s + scen.amountKobo);
-          done(2);
-        });
-      } else if (step === 3) {
-        later(900, () => {
-          pushFrame({ id: uid("f"), from: "gate", tone: "ok", text: `Rule check passed. Below threshold.` });
-          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "settled", koraRef: koraRef() } : p)));
-          setSpent((s) => s + scen.amountKobo);
-          done(3);
-        });
-      } else if (step === 4) {
-        setAttackSnippet(true);
-        later(900, () => {
-          pushFrame({ id: uid("f"), from: "gate", tone: "bad", text: `AI Gate BLOCKED: Prompt injection detected.` });
-          setBanner("INTENT DRIFT: AI Gate intercepted unauthorized transfer.");
-          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "blocked" } : p)));
-          notify({
-            id: uid("n"),
-            tone: "bad",
-            title: "Threat Blocked",
-            body: "A rogue prompt injection attempting to spend was stopped.",
-          });
-          done(4);
-        });
-      } else if (step === 5) {
-        later(900, () => {
-          pushFrame({ id: uid("f"), from: "gate", tone: "warn", text: `Above approval threshold. Asking owner.` });
-          setPayments((list) => list.map((p) => (p.id === pid ? { ...p, status: "pending_approval" } : p)));
-          notify({
-            id: uid("n"),
-            tone: "warn",
-            title: "Approval Needed",
-            body: `${scen.label} is above threshold. Your nod is required.`,
-          });
-          done(5);
-        });
-      }
+      if (step === 1) compile(englishRule);
+      else void reload();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [compile, englishRule],
+    [compile, englishRule, reload],
   );
 
-  const approve = (id: string) => {
-    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "approved" } : p)));
-    later(600, () => {
-      setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "settled", koraRef: koraRef() } : p)));
-      const p = payments.find((item) => item.id === id);
-      if (p) setSpent((s) => s + p.amountKobo);
-    });
-  };
+  const approve = async (id: string) => { await ownerFetch(`/v1/approvals/${id}`, { method: "POST", body: JSON.stringify({ decision: "approve" }) }); await reload(); };
 
-  const deny = (id: string) => {
-    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "denied" } : p)));
-  };
+  const deny = async (id: string) => { await ownerFetch(`/v1/approvals/${id}`, { method: "POST", body: JSON.stringify({ decision: "deny" }) }); await reload(); };
 
-  const release = (id: string) => {
-    setPayments((list) => list.map((p) => (p.id === id ? { ...p, status: "settled", koraRef: koraRef() } : p)));
-  };
+  const release = async (id: string) => { await ownerFetch(`/v1/escrows/${id}/release`, { method: "POST" }); await reload(); };
 
   const replay = (id: string) => {
     setPayments((list) => list.map((p) => (p.id === id ? { ...p, replays: (p.replays || 0) + 1 } : p)));
@@ -330,7 +230,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const revoke = () => {
     revokedRef.current = true;
     setRevoked(true);
-    setAgents((prev) => prev.map((a) => ({ ...a, status: "paused" })));
+    void Promise.all(agents.map((agent) => ownerFetch(`/v1/agents/${agent.id}/brake`, { method: "POST" }))).then(reload);
     notify({
       id: uid("n"),
       tone: "bad",
@@ -342,10 +242,10 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const reset = () => {
     revokedRef.current = false;
     setRevoked(false);
-    setSpent(STARTING_SPENT_KOBO);
-    setPayments(DEMO_PAYMENTS);
-    setAgents(INITIAL_AGENTS);
-    setLedger(DEMO_LEDGER);
+    setSpent(0);
+    setPayments([]);
+    setAgents([]);
+    setLedger([]);
     setFrames([]);
     setNotices([]);
     setBanner(null);
@@ -363,6 +263,11 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       setEnglishRule,
       spentKobo,
       payments,
+      approvals,
+      balance,
+      loading,
+      loadError,
+      reload,
       ledger,
       agents,
       addAgent,
@@ -390,6 +295,11 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       englishRule,
       spentKobo,
       payments,
+      approvals,
+      balance,
+      loading,
+      loadError,
+      reload,
       ledger,
       agents,
       addAgent,
