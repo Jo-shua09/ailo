@@ -7,8 +7,31 @@ import { naira } from "@/src/lib/format";
 import { Button } from "@/src/components/ui/button";
 import { DataStatus } from "./DataStatus";
 
+const CHECK_NAMES: Record<string, string> = {
+  signature: "Badge",
+  rules: "Spec Gate",
+  reserve: "Reserve",
+  second_look: "Second Look",
+  nod: "Nod",
+  payout: "Payout",
+};
+
 export function TransactionsView() {
-  const { payments, loading, loadError, reload } = useSpecGate();
+  const { payments, loading, loadError, reload, squareUp } = useSpecGate();
+  const [squaring, setSquaring] = useState(false);
+  const [squareResult, setSquareResult] = useState<string | null>(null);
+
+  const handleSquareUp = async () => {
+    setSquaring(true);
+    try {
+      const r = await squareUp();
+      setSquareResult(`Square Up checked ${r.checked_count} payment${r.checked_count === 1 ? "" : "s"} with Kora · ${r.breaks_count} mismatch${r.breaks_count === 1 ? "" : "es"}`);
+    } catch (err) {
+      setSquareResult(err instanceof Error ? err.message : "Square Up failed.");
+    } finally {
+      setSquaring(false);
+    }
+  };
   const [filter, setFilter] = useState<"all" | "settled" | "pending" | "blocked">("all");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
@@ -38,8 +61,16 @@ export function TransactionsView() {
           </p>
         </div>
 
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <button
+          onClick={() => void handleSquareUp()}
+          disabled={squaring}
+          className="px-3.5 py-2 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-semibold transition-all disabled:opacity-60"
+        >
+          {squaring ? "Checking with Kora..." : "Square Up"}
+        </button>
         {/* Filter buttons */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200/60 self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200/60">
           {(
             [
               ["all", "All"],
@@ -61,7 +92,12 @@ export function TransactionsView() {
             </button>
           ))}
         </div>
+        </div>
       </div>
+
+      {squareResult && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-xs font-semibold text-slate-700">{squareResult}</div>
+      )}
 
       <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
 
@@ -126,7 +162,7 @@ export function TransactionsView() {
                     ) : (
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                     )}
-                    {isSettled ? "Settled" : isBlocked ? "Blocked" : "Needs Nod"}
+                    {isSettled ? "Settled" : isBlocked ? "Blocked" : p.status === "submitted" ? "Submitted" : "Needs Nod"}
                   </span>
 
                   <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
@@ -169,7 +205,7 @@ export function TransactionsView() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Settlement Ref:</span>
-                  <span className="font-mono text-slate-800">{selectedPayment.koraRef || "SIMULATED_REF_PENDING"}</span>
+                  <span className="font-mono text-slate-800">{selectedPayment.koraRef || "None (no payout)"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Idempotency Key:</span>
@@ -179,12 +215,27 @@ export function TransactionsView() {
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
                 <p className="text-xs font-bold text-slate-700">Audit Verification</p>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {selectedPayment.ruleCheck.detail}
-                </p>
-                <p className="text-xs text-slate-600 leading-relaxed pt-1">
-                  AI Verdict: {selectedPayment.aiVerdict.detail || selectedPayment.aiVerdict.reason}
-                </p>
+                {selectedPayment.checks?.length ? (
+                  <ol className="space-y-1.5">
+                    {selectedPayment.checks.map((c, i) => (
+                      <li key={`${c.step}-${i}`} className="flex gap-2 text-xs leading-relaxed">
+                        <span
+                          className={`shrink-0 w-14 font-bold uppercase ${
+                            c.result === "pass" ? "text-emerald-600" : c.result === "fail" ? "text-rose-600" : "text-slate-400"
+                          }`}
+                        >
+                          {c.result}
+                        </span>
+                        <span className="text-slate-600">
+                          <span className="font-semibold text-slate-800">{CHECK_NAMES[c.step] ?? c.step}</span>
+                          {c.detail ? ` · ${c.detail}` : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-xs text-slate-600 leading-relaxed">Check trail not loaded yet.</p>
+                )}
               </div>
             </div>
 

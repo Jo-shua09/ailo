@@ -11,17 +11,39 @@ import {
   Sparkles,
   HelpCircle,
 } from "lucide-react";
-import { useSpecGate } from "@/src/lib/specgate-store";
+import { useSpecGate, type SpendPolicy } from "@/src/lib/specgate-store";
 import { Button } from "@/src/components/ui/button";
+
+// What the saved policy would do with an example purchase (same order as the API: block wins, then Nod).
+function verdict(policy: SpendPolicy | null, category: string, amountKobo: number) {
+  if (!policy) return null;
+  const perPayment = policy.spending_limits.find((l) => l.interval === "per_payment")?.amount_kobo;
+  if (!policy.allowed_categories.some((c) => c.toLowerCase() === category)) return "Blocked";
+  if (perPayment && amountKobo > perPayment) return "Blocked";
+  if (amountKobo > policy.nod_above_kobo) return "Needs approval";
+  return "Allowed";
+}
+
+const EXAMPLES = [
+  { label: "Rice & cooking oil - ₦8,500", category: "groceries", amountKobo: 850_000, Icon: ShoppingBag },
+  { label: "Electronics - ₦75,000", category: "electronics", amountKobo: 7_500_000, Icon: Tv },
+  { label: "Groceries - ₦15,000", category: "groceries", amountKobo: 1_500_000, Icon: Package },
+];
+
+const TONE = {
+  Allowed: "text-emerald-600 bg-emerald-50",
+  "Needs approval": "text-amber-600 bg-amber-50",
+  Blocked: "text-rose-600 bg-rose-50",
+} as const;
+const DOT = { Allowed: "bg-emerald-500", "Needs approval": "bg-amber-500", Blocked: "bg-rose-500" } as const;
 
 export function RulesView() {
   const {
-    englishRule,
     setEnglishRule,
-    compiled,
-    compiling,
-    runStep,
     revoked,
+    rule,
+    compileRule,
+    saveRule,
   } = useSpecGate();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -29,29 +51,51 @@ export function RulesView() {
     "My shop agent can spend ₦50,000 a week on stock.\nAsk me before payments above ₦10,000."
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<SpendPolicy | null>(null);
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
-  // Suggested rule code based on the english text
-  const specGateCode = `allow {
-  merchant: "approved_stores",
-  category: ["groceries", "supplies"],
-  max_amount: 10000,
-  weekly_limit: 50000
-}`;
+  // Show the rule that is enforced now, once it arrives from the API (state adjusted during render, not in an effect).
+  if (rule && rule.version !== loadedVersion) {
+    setLoadedVersion(rule.version);
+    setRuleText(rule.english_rule);
+  }
 
-  const handleGenerate = () => {
+  const policy = draft ?? rule?.policy ?? null;
+  const specGateCode = policy
+    ? JSON.stringify(policy, null, 2)
+    : "No rule saved yet. Write one and press Generate Rule.";
+
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    setError(null);
+    try {
+      setDraft(await compileRule(ruleText));
       setStep(2);
-    }, 400);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not generate the rule.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleSave = () => {
-    runStep(1);
-    setStep(3);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+  const handleSave = async () => {
+    if (!draft) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await saveRule(ruleText, draft);
+      setDraft(null);
+      setStep(3);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the rule.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -66,6 +110,10 @@ export function RulesView() {
           </div>
           <span className="text-xs font-bold text-emerald-700">Active</span>
         </div>
+      )}
+
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">{error}</div>
       )}
 
       {/* Header card */}
@@ -173,7 +221,7 @@ export function RulesView() {
             </div>
 
             <button
-              onClick={handleGenerate}
+              onClick={() => void handleGenerate()}
               disabled={isGenerating}
               className="w-full rounded-xl bg-black hover:bg-slate-800 text-white py-3 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-99 shadow-sm"
             >
@@ -184,7 +232,7 @@ export function RulesView() {
           {/* Right Column: Suggested Rule Code */}
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-700">
-              Suggested Rule (SpecGate)
+              {draft ? "Suggested Rule (not saved yet)" : rule ? `Active Rule · version ${rule.version}` : "Suggested Rule (SpecGate)"}
             </label>
 
             <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-4 font-mono text-xs text-slate-800 h-[178px] overflow-y-auto leading-relaxed select-text">
@@ -200,66 +248,37 @@ export function RulesView() {
           </h2>
 
           <div className="space-y-2.5">
-            {/* Example 1: Rice & cooking oil - ₦8,500 */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-100 hover:border-slate-200 shadow-xs transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                  <ShoppingBag className="h-4 w-4" />
+            {EXAMPLES.map(({ label, category, amountKobo, Icon }) => {
+              const result = verdict(policy, category, amountKobo);
+              return (
+                <div key={label} className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-100 hover:border-slate-200 shadow-xs transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-600">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-medium text-slate-800">{label}</span>
+                  </div>
+                  {result ? (
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${TONE[result]}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${DOT[result]}`} />
+                      {result}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">No rule yet</span>
+                  )}
                 </div>
-                <span className="text-xs font-medium text-slate-800">
-                  Rice & cooking oil - ₦8,500
-                </span>
-              </div>
-
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold text-emerald-600 bg-emerald-50">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Allowed
-              </span>
-            </div>
-
-            {/* Example 2: Electronics - ₦75,000 */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-100 hover:border-slate-200 shadow-xs transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                  <Tv className="h-4 w-4" />
-                </div>
-                <span className="text-xs font-medium text-slate-800">
-                  Electronics - ₦75,000
-                </span>
-              </div>
-
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold text-amber-600 bg-amber-50">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Needs approval
-              </span>
-            </div>
-
-            {/* Example 3: Groceries - ₦15,000 */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-100 hover:border-slate-200 shadow-xs transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                  <Package className="h-4 w-4" />
-                </div>
-                <span className="text-xs font-medium text-slate-800">
-                  Groceries - ₦15,000
-                </span>
-              </div>
-
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold text-amber-600 bg-amber-50">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Needs approval
-              </span>
-            </div>
+              );
+            })}
           </div>
 
           {/* Bottom right: Save Rule button */}
           <div className="flex justify-end pt-4">
             <button
-              onClick={handleSave}
-              disabled={compiling || revoked}
+              onClick={() => void handleSave()}
+              disabled={!draft || isSaving || revoked}
               className="rounded-xl bg-black hover:bg-slate-800 text-white px-7 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-98 shadow-sm"
             >
-              {compiling ? "Saving..." : "Save Rule"}
+              {isSaving ? "Saving..." : "Save Rule"}
             </button>
           </div>
         </div>

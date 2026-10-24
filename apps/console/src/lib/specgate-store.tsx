@@ -39,9 +39,25 @@ export type Payment = {
   };
   code?: string;
   koraRef?: string;
+  /** The receipt's check trail from GET /v1/payments/:id. */
+  checks?: Check[];
   replays: number;
   createdAt: number;
 };
+
+export type Check = { step: string; result: "pass" | "fail" | "skipped"; detail?: string };
+
+/** Spec Gate policy, as the API stores it (amounts in kobo). */
+export type SpendPolicy = {
+  allowed_categories: string[];
+  allowed_payees: string[];
+  spending_limits: { amount_kobo: number; interval: "per_payment" | "daily" | "weekly"; categories?: string[] }[];
+  nod_above_kobo: number;
+  nod_rolling_payee_24h_kobo: number;
+  expires_at: string;
+};
+
+export type SavedRule = { version: number; english_rule: string; policy: SpendPolicy; created_at: string };
 
 export type LedgerEntry = {
   id: string;
@@ -83,6 +99,10 @@ type Store = {
   loading: boolean;
   loadError: string | null;
   reload: () => Promise<void>;
+  rule: SavedRule | null;
+  compileRule: (english: string) => Promise<SpendPolicy>;
+  saveRule: (english: string, policy: SpendPolicy) => Promise<void>;
+  squareUp: () => Promise<{ checked_count: number; breaks_count: number; status: string }>;
   ledger: LedgerEntry[];
   agents: Agent[];
   registerAgent: (name: string, publicKeyX: string) => Promise<void>;
@@ -108,6 +128,20 @@ const Ctx = createContext<Store | null>(null);
 const DEFAULT_RULE = "My shop agent can spend ₦50,000 a week on stock. Ask me above ₦10,000.";
 
 let seq = 0;
+// Receipts carry the real verdicts; the payments list does not, so read them from the check trail.
+const limitOf = (policy: SpendPolicy | undefined, interval: "per_payment" | "daily" | "weekly") =>
+  policy?.spending_limits.find((l) => l.interval === interval)?.amount_kobo ?? 0;
+
+function verdictsFrom(checks: Check[], decidedBy: unknown): Pick<Payment, "ruleCheck" | "aiVerdict"> {
+  const rules = checks.find((c) => c.step === "rules");
+  const look = checks.find((c) => c.step === "second_look");
+  const action = !look || look.result !== "fail" ? "ok" : decidedBy === "second_look" ? "block" : "escalate";
+  return {
+    ruleCheck: { pass: rules?.result !== "fail", detail: rules?.detail || "No rule check recorded" },
+    aiVerdict: { action, reason: look ? `${look.result === "skipped" ? "Not run" : look.result}: ${look.detail || ""}` : "Not run" },
+  };
+}
+
 const uid = (p: string) => `${p}_${(++seq).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export function SpecGateProvider({ children }: { children: ReactNode }) {
@@ -121,6 +155,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [approvals, setApprovals] = useState<{ id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[]>([]);
   const [balance, setBalance] = useState(0);
+  const [rule, setRule] = useState<SavedRule | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
@@ -131,14 +166,22 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [paymentData, approvalData, agentData, balanceData] = await Promise.all([
+      const [paymentData, approvalData, agentData, balanceData, ruleData] = await Promise.all([
         ownerFetch<{ payments?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/payments"),
         ownerFetch<{ approvals?: typeof approvals } | typeof approvals>("/v1/approvals"),
         ownerFetch<{ agents?: Record<string, unknown>[] } | Record<string, unknown>[]>("/v1/agents"),
         ownerFetch<Record<string, number>>("/v1/ledger/balances"),
+        ownerFetch<SavedRule[]>("/v1/mandates"), // newest first
       ]);
+      const latestRule = ruleData[0] ?? null;
+      setRule(latestRule);
 
       const rawPayments = Array.isArray(paymentData) ? paymentData : (paymentData.payments || []);
+      const receipts = new Map<string, Check[]>();
+      await Promise.all(rawPayments.slice(0, 20).map(async (p) => {
+        const detail = await ownerFetch<{ receipt?: { checks?: Check[] } }>(`/v1/payments/${String(p.id)}`).catch(() => null);
+        if (detail?.receipt?.checks) receipts.set(String(p.id), detail.receipt.checks);
+      }));
       setPayments(rawPayments.map((p) => ({
         id: String(p.id), step: 0, label: String(p.narration || p.reason || "Payment"),
         payee: String(p.payee_name || p.payee_id || "Payee"), amount_kobo: Number(p.amount_kobo || 0), amountKobo: Number(p.amount_kobo || 0),
@@ -147,6 +190,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
         aiVerdict: (p.second_look as Payment["aiVerdict"]) || { action: "ok", reason: "No Second Look detail" },
         code: p.reason_code as string | undefined, koraRef: p.kora_reference as string | undefined, replays: 0,
         createdAt: Date.parse(String(p.created_at || "")) || Date.now(),
+        ...(receipts.has(String(p.id)) ? { checks: receipts.get(String(p.id)), ...verdictsFrom(receipts.get(String(p.id))!, p.decided_by) } : {}),
       })));
 
       const rawApprovals = Array.isArray(approvalData) ? approvalData : (approvalData.approvals || []);
@@ -155,8 +199,8 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       const rawAgents = Array.isArray(agentData) ? agentData : (agentData.agents || []);
       setAgents(rawAgents.map((a) => ({
         id: String(a.id), name: String(a.name || "Agent"), role: "AI agent", avatar: "/images/shop-agent.jpg",
-        status: a.status === "active" ? "active" : "paused", spentThisWeek: "", allowanceKobo: Number((a.rules as Record<string, unknown> | undefined)?.max_amount_kobo || 0),
-        thresholdKobo: 0, description: "Registered agent",
+        status: a.status === "active" ? "active" : "paused", spentThisWeek: "", allowanceKobo: limitOf(latestRule?.policy, "weekly") || limitOf(latestRule?.policy, "per_payment"),
+        thresholdKobo: latestRule?.policy.nod_above_kobo ?? 0, description: "Registered agent",
       })));
 
       const avail = balanceData.available_balance ?? balanceData.available_balance_kobo ?? balanceData.owner_wallet ?? 0;
@@ -205,6 +249,24 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       }),
     });
     await reload();
+  }, [reload]);
+
+  // Spec Gate: the model only proposes a policy; nothing is enforced until saveRule stores it.
+  const compileRule = useCallback(async (english: string) => {
+    const { policy } = await ownerFetch<{ policy: SpendPolicy }>("/v1/mandates/compile", { method: "POST", body: JSON.stringify({ english }) });
+    return policy;
+  }, []);
+
+  const saveRule = useCallback(async (english: string, policy: SpendPolicy) => {
+    await ownerFetch("/v1/mandates", { method: "POST", body: JSON.stringify({ english, policy }) });
+    await reload();
+  }, [reload]);
+
+  // Square Up: asks Kora for the final status of anything still in flight.
+  const squareUp = useCallback(async () => {
+    const result = await ownerFetch<{ checked_count: number; breaks_count: number; status: string }>("/v1/ops/reconcile", { method: "POST" });
+    await reload();
+    return result;
   }, [reload]);
 
   const toggleAgentStatus = useCallback((id: string) => {
@@ -299,6 +361,10 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       loading,
       loadError,
       reload,
+      rule,
+      compileRule,
+      saveRule,
+      squareUp,
       ledger,
       agents,
       registerAgent,
@@ -331,6 +397,10 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       loading,
       loadError,
       reload,
+      rule,
+      compileRule,
+      saveRule,
+      squareUp,
       ledger,
       agents,
       registerAgent,
