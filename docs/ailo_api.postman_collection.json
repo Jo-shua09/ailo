@@ -6,15 +6,55 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:4000", "type": "string" },
-    { "key": "ownerPin", "value": "", "type": "string", "description": "Your OWNER_PIN from apps/api/.env (6+ characters). Never commit a real value." },
-    { "key": "owner_token", "value": "", "type": "string" },
-    { "key": "agent_id", "value": "", "type": "string" },
-    { "key": "agent_public_x", "value": "", "type": "string", "description": "The 'x' of the public JWK printed by: cd apps/agent && uv run python -m ailo_agent.keys" },
-    { "key": "agent_token", "value": "", "type": "string", "description": "Paste the full 'Agent ...' header value from ailo_agent.signing" },
-    { "key": "payment_id", "value": "", "type": "string" },
-    { "key": "approval_id", "value": "", "type": "string" },
-    { "key": "kora_secret_key", "value": "", "type": "string", "description": "Same as KORA_SECRET_KEY in apps/api/.env, used only to sign simulated webhooks locally." }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "ownerPin",
+      "value": "",
+      "type": "string",
+      "description": "Your OWNER_PIN from apps/api/.env (6+ characters). Never commit a real value."
+    },
+    {
+      "key": "owner_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "agent_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "agent_public_x",
+      "value": "",
+      "type": "string",
+      "description": "The 'x' of the public JWK printed by: cd apps/agent && uv run python -m ailo_agent.keys"
+    },
+    {
+      "key": "agent_token",
+      "value": "",
+      "type": "string",
+      "description": "Paste the full 'Agent ...' header value from ailo_agent.signing"
+    },
+    {
+      "key": "payment_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "approval_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "kora_secret_key",
+      "value": "",
+      "type": "string",
+      "description": "Same as KORA_SECRET_KEY in apps/api/.env, used only to sign simulated webhooks locally."
+    }
   ],
   "item": [
     {
@@ -22,11 +62,37 @@
       "item": [
         {
           "name": "Health Check",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/health", "host": ["{{baseUrl}}"], "path": ["v1", "health"] } }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "health"
+              ]
+            }
+          }
         },
         {
           "name": "JWKS (active agents' public keys)",
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/.well-known/jwks.json", "host": ["{{baseUrl}}"], "path": [".well-known", "jwks.json"] } }
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/jwks.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ".well-known",
+                "jwks.json"
+              ]
+            }
+          }
         }
       ]
     },
@@ -35,14 +101,40 @@
       "item": [
         {
           "name": "Create Owner Session",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "if (pm.response.code === 200) pm.collectionVariables.set('owner_token', pm.response.json().token);"
-          ] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('owner_token', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"pin\": \"{{ownerPin}}\"\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/owner/session", "host": ["{{baseUrl}}"], "path": ["v1", "owner", "session"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{ownerPin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/owner/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "owner",
+                "session"
+              ]
+            },
             "description": "Swaps OWNER_PIN for a 12 h owner token (saved to owner_token). 5 wrong PINs from one IP lock that IP out for 15 minutes."
           }
         }
@@ -53,33 +145,115 @@
       "item": [
         {
           "name": "Register Agent",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "if (pm.response.code === 201) pm.collectionVariables.set('agent_id', pm.response.json().id);"
-          ] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('agent_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Shop agent\",\n  \"public_jwk\": { \"kty\": \"OKP\", \"crv\": \"Ed25519\", \"x\": \"{{agent_public_x}}\" }\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/agents", "host": ["{{baseUrl}}"], "path": ["v1", "agents"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Shop agent\",\n  \"public_jwk\": { \"kty\": \"OKP\", \"crv\": \"Ed25519\", \"x\": \"{{agent_public_x}}\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/agents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agents"
+              ]
+            },
             "description": "The agent makes its own keypair (`cd apps/agent && uv run python -m ailo_agent.keys`) and only the PUBLIC key is registered. The server never sees a private key; a JWK containing `d` is rejected."
           }
         },
         {
           "name": "List Agents",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/agents", "host": ["{{baseUrl}}"], "path": ["v1", "agents"] } }
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/agents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agents"
+              ]
+            }
+          }
         },
         {
           "name": "Agent: who am I (signed)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "{{agent_token}}" }],
-            "url": { "raw": "{{baseUrl}}/v1/agents/me", "host": ["{{baseUrl}}"], "path": ["v1", "agents", "me"] },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{agent_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/agents/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agents",
+                "me"
+              ]
+            },
             "description": "Generate the token: cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} GET /v1/agents/me"
           }
         },
         {
           "name": "Pull Brake (kill switch)",
-          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/agents/{{agent_id}}/brake", "host": ["{{baseUrl}}"], "path": ["v1", "agents", "{{agent_id}}", "brake"] } }
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/agents/{{agent_id}}/brake",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agents",
+                "{{agent_id}}",
+                "brake"
+              ]
+            }
+          }
         }
       ]
     },
@@ -90,14 +264,55 @@
           "name": "Top Up Owner Wallet (mirror ledger)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
-            "body": { "mode": "raw", "raw": "{\n  \"amount_kobo\": 5000000,\n  \"description\": \"Demo top-up (50,000 NGN, sandbox)\"\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/ledger/topup", "host": ["{{baseUrl}}"], "path": ["v1", "ledger", "topup"] }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount_kobo\": 5000000,\n  \"description\": \"Demo top-up (50,000 NGN, sandbox)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/ledger/topup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "ledger",
+                "topup"
+              ]
+            }
           }
         },
         {
           "name": "Get Balances",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/ledger/balances", "host": ["{{baseUrl}}"], "path": ["v1", "ledger", "balances"] } }
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/ledger/balances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "ledger",
+                "balances"
+              ]
+            }
+          }
         }
       ]
     },
@@ -106,28 +321,94 @@
       "item": [
         {
           "name": "Submit Payment (agent-signed)",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "var j = pm.response.json(); if (j.payment) pm.collectionVariables.set('payment_id', j.payment.id);"
-          ] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var j = pm.response.json(); if (j.payment) pm.collectionVariables.set('payment_id', j.payment.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{$guid}}" },
-              { "key": "Authorization", "value": "{{agent_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{agent_token}}"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\"payee_id\":\"payee_mama_ngozi\",\"amount_kobo\":850000,\"category\":\"groceries\",\"reason\":\"Restock rice for the shop\"}" },
-            "url": { "raw": "{{baseUrl}}/v1/payments", "host": ["{{baseUrl}}"], "path": ["v1", "payments"] },
-            "description": "The signature covers the exact body bytes. 1) Save this body (one line, no changes) to apps/agent/body.json. 2) cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} POST /v1/payments body.json 3) Paste the printed 'Agent ...' into agent_token and send within 60 s. Each token works once. Bank details come from the server's payee directory (payee_mama_ngozi, payee_lagos_logistics), never from this body."
+            "body": {
+              "mode": "raw",
+              "raw": "{\"payee_id\":\"payee_mama_ngozi\",\"amount_kobo\":850000,\"category\":\"groceries\",\"reason\":\"Restock rice for the shop\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            },
+            "description": "The signature covers the exact body bytes. 1) Save this body (one line, no changes) to apps/agent/body.json. 2) cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} POST /v1/payments body.json 3) Paste the printed 'Agent ...' into agent_token and send within 60 s. Each token works once. Bank details come from the server's payee directory (payee_mama_ngozi, payee_lagos_logistics), never from this body. Optional field: page_text (max 20,000 chars), the shop page the agent acted on, so Second Look can spot a poisoned page. Kora pays out only between N1,000 and N10,000,000, so amount_kobo must be at least 100000."
           }
         },
         {
           "name": "List Payments",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/payments", "host": ["{{baseUrl}}"], "path": ["v1", "payments"] } }
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments"
+              ]
+            }
+          }
         },
         {
           "name": "Get Payment + Receipt",
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/payments/{{payment_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "payments", "{{payment_id}}"] } }
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/{{payment_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            }
+          }
         }
       ]
     },
@@ -136,27 +417,120 @@
       "item": [
         {
           "name": "List Pending Approvals",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "var a = pm.response.json().approvals || []; if (a.length) pm.collectionVariables.set('approval_id', a[0].id);"
-          ] } }],
-          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/approvals", "host": ["{{baseUrl}}"], "path": ["v1", "approvals"] } }
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var a = pm.response.json().approvals || []; if (a.length) pm.collectionVariables.set('approval_id', a[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/approvals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "approvals"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Approval",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "approvals",
+                "{{approval_id}}"
+              ]
+            }
+          }
         },
         {
           "name": "Approve",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
-            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"approve\"\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "approvals", "{{approval_id}}"] }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "approvals",
+                "{{approval_id}}"
+              ]
+            }
           }
         },
         {
           "name": "Deny",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
-            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"deny\"\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "approvals", "{{approval_id}}"] }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"deny\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "approvals",
+                "{{approval_id}}"
+              ]
+            }
           }
         }
       ]
@@ -166,32 +540,84 @@
       "item": [
         {
           "name": "Webhook - transfer.success",
-          "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
-            "// Kora signs HMAC-SHA256 of JSON.stringify(body.data) with the secret key (Kora webhook docs), not the whole body.",
-            "var data = JSON.parse(pm.request.body.raw).data;",
-            "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
-            "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
-          ] } }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Kora signs HMAC-SHA256 of JSON.stringify(body.data) with the secret key (Kora webhook docs), not the whole body.",
+                  "var data = JSON.parse(pm.request.body.raw).data;",
+                  "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event\": \"transfer.success\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"success\", \"amount\": \"8500.00\", \"fee\": 10, \"currency\": \"NGN\" }\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/webhooks/kora", "host": ["{{baseUrl}}"], "path": ["v1", "webhooks", "kora"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"transfer.success\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"success\", \"amount\": \"8500.00\", \"fee\": 10, \"currency\": \"NGN\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/webhooks/kora",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks",
+                "kora"
+              ]
+            },
             "description": "Real Kora webhooks need a public URL (ngrok). The server treats a webhook as a hint and re-checks the payout with Kora (GET /transactions/:reference)."
           }
         },
         {
           "name": "Webhook - transfer.failed",
-          "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
-            "var data = JSON.parse(pm.request.body.raw).data;",
-            "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
-            "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
-          ] } }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var data = JSON.parse(pm.request.body.raw).data;",
+                  "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event\": \"transfer.failed\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"failed\", \"amount\": \"8500.00\", \"fee\": 0, \"currency\": \"NGN\" }\n}" },
-            "url": { "raw": "{{baseUrl}}/v1/webhooks/kora", "host": ["{{baseUrl}}"], "path": ["v1", "webhooks", "kora"] }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"transfer.failed\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"failed\", \"amount\": \"8500.00\", \"fee\": 0, \"currency\": \"NGN\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/webhooks/kora",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks",
+                "kora"
+              ]
+            }
           }
         }
       ]
@@ -201,14 +627,53 @@
       "item": [
         {
           "name": "Square Up (reconcile with Kora)",
-          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/ops/reconcile", "host": ["{{baseUrl}}"], "path": ["v1", "ops", "reconcile"] } }
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/ops/reconcile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "ops",
+                "reconcile"
+              ]
+            }
+          }
         },
         {
           "name": "Live Events (SSE)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Accept", "value": "text/event-stream" }],
-            "url": { "raw": "{{baseUrl}}/v1/events?access_token={{owner_token}}", "host": ["{{baseUrl}}"], "path": ["v1", "events"], "query": [{ "key": "access_token", "value": "{{owner_token}}" }] },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/events?access_token={{owner_token}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{owner_token}}"
+                }
+              ]
+            },
             "description": "Browsers cannot send headers on EventSource, so the owner token goes in ?access_token= (RFC 6750 section 2.3)."
           }
         }
