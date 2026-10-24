@@ -307,8 +307,8 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       events = new EventSource(`${API}/v1/events?access_token=${encodeURIComponent(token)}`);
       const refresh = () => void reload();
       events.onmessage = refresh;
-      // The server may emit typed SSE events, which do not trigger onmessage.
-      for (const eventName of ["payment_created", "payment_updated", "approval_updated", "ledger_updated"]) {
+      // The API sends named SSE events (apps/api events.service.ts), which never trigger onmessage.
+      for (const eventName of ["payment.updated", "approval.created"]) {
         events.addEventListener(eventName, refresh);
       }
       // Keep the dashboard current if the stream is unavailable or an event is missed.
