@@ -37,7 +37,7 @@ describe("agentSignature", () => {
   it("accepts a correctly signed request and identifies the agent", async () => {
     const res = await post(await signRequest(keys.privateKey, agentId, { method: "POST", path: "/v1/pay", body }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ agent: { id: agentId, name: "Shop agent" } });
+    expect(await res.json()).toEqual({ agent: { id: agentId } });
   });
 
   it("rejects a missing signature", async () => {

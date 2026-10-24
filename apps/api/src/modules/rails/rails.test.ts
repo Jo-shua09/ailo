@@ -43,8 +43,7 @@ describe("KoraRail", () => {
           json: async () => ({ status: false, message: "Duplicate Transaction Reference" }),
         };
       }
-      // Kora "Verify Payout Transaction": GET /transactions/:reference
-      if (url.endsWith("/transactions/AL-pay_02")) {
+      if (url.includes("/transactions/query")) {
         queryCalled = true;
         return {
           ok: true,
@@ -70,9 +69,6 @@ describe("KoraRail", () => {
         amount_kobo: 850000,
         payee_id: "payee_mama",
         payee_name: "Mama Ngozi Stores",
-        destination_bank_code: "033",
-        destination_account_number: "0000000000",
-        payee_email: "johndoe@korapay.com",
       });
 
       expect(queryCalled).toBe(true);

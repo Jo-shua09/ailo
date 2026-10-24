@@ -73,7 +73,7 @@ export function agentSignature(deps: { agents: AgentRepository }): RequestHandle
       }
       if (!replay.firstUse(payload.jti!, payload.exp! * 1000)) throw unauthorized("REPLAYED", "Token already used");
 
-      req.agent = { id: agent.id, name: agent.name };
+      req.agent = { id: agent.id };
       next();
     } catch (err) {
       next(err);

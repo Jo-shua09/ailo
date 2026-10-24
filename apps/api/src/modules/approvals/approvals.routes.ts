@@ -26,7 +26,7 @@ router.get("/approvals/:id", async (req, res, next) => {
 router.post("/approvals/:id", validate({ body: ApprovalDecisionInput }), async (req, res, next) => {
   try {
     const { decision } = req.body as ApprovalDecisionInput;
-    const result = await approvalsService.decide(String(req.params.id), decision);
+    const result = await approvalsService.decide(req.params.id as string, decision);
     res.json(result);
   } catch (err) {
     next(err);

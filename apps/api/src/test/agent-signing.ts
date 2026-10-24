@@ -5,8 +5,7 @@ import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from "jose";
 
 export async function newAgentKeys() {
   const { publicKey, privateKey } = await generateKeyPair("EdDSA", { crv: "Ed25519", extractable: true });
-  const publicJwk = (await exportJWK(publicKey)) as { kty: "OKP"; crv: "Ed25519"; x: string };
-  return { privateKey, publicJwk };
+  return { privateKey, publicJwk: await exportJWK(publicKey) };
 }
 
 export function bodyHash(body: string): string {

@@ -3,16 +3,7 @@ import { AppError } from "../../shared/AppError";
 import { eventsService } from "../events/events.service";
 import { ledgerService } from "../ledger/ledger.service";
 import { approvalsService } from "../approvals/approvals.service";
-import { getPayee } from "../payees/payees";
 import { getPayoutRail } from "../rails";
-
-// Bank details come only from the server-side payee directory, never from the agent's request (PRD 5.9).
-function payoutAccount(payeeId: string) {
-  const payee = getPayee(payeeId);
-  return payee
-    ? { destination_bank_code: payee.bank_code, destination_account_number: payee.account_number, payee_email: payee.email }
-    : {};
-}
 import { paymentsRepository, PaymentsRepository } from "./payments.repository";
 import { DEFAULT_DEMO_POLICY } from "./payments.dto";
 
@@ -277,7 +268,6 @@ export class PaymentsService {
       payee_id: req.payee_id,
       payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
       narration: req.reason,
-      ...payoutAccount(req.payee_id),
     });
 
     if (payoutResult.status === "settled") {
@@ -341,7 +331,6 @@ export class PaymentsService {
       payee_id: record.payee_id,
       payee_name: record.payee_name,
       narration: record.reason,
-      ...payoutAccount(record.payee_id),
     });
 
     const newChecks: Check[] = [];

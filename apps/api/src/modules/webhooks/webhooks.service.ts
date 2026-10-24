@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { env } from "../../config/env";
 import { AppError } from "../../shared/AppError";
 import { eventsService } from "../events/events.service";
@@ -11,13 +11,28 @@ import type { KoraWebhookPayload } from "./webhooks.dto";
 export class WebhooksService {
   constructor(private repo: WebhooksRepository = webhooksRepository) {}
 
-  /** Kora signs HMAC-SHA256(JSON.stringify(body.data)) with the secret key, hex (Kora webhook docs). */
-  verifySignature(data: unknown, signature: string, secret = env.KORA_SECRET_KEY): boolean {
+  verifySignature(
+    rawBody: string | Buffer,
+    signature: string,
+    secret = env.KORA_SECRET_KEY,
+    dataObject?: unknown
+  ): boolean {
     if (!signature || !secret) return false;
-    const computed = Buffer.from(createHmac("sha256", secret).update(JSON.stringify(data)).digest("hex"));
-    const received = Buffer.from(signature.toLowerCase());
-    // Constant-time: this compares a secret-derived value, so timing must not leak how much matched.
-    return computed.length === received.length && timingSafeEqual(computed, received);
+    // 1. Raw body HMAC check (Ailo engine requirement)
+    const computedRaw = createHmac("sha256", secret)
+      .update(rawBody)
+      .digest("hex");
+    if (computedRaw.toLowerCase() === signature.toLowerCase()) return true;
+
+    // 2. Data object HMAC check (Kora official documentation specification)
+    if (dataObject !== undefined) {
+      const computedData = createHmac("sha256", secret)
+        .update(JSON.stringify(dataObject))
+        .digest("hex");
+      if (computedData.toLowerCase() === signature.toLowerCase()) return true;
+    }
+
+    return false;
   }
 
   async processWebhook(payload: KoraWebhookPayload): Promise<{ status: "processed" | "deduplicated" }> {

@@ -1,26 +1,52 @@
 import { z } from "zod";
 
-export const AgentStatus = z.enum(["active", "revoked"]);
-export type AgentStatus = z.infer<typeof AgentStatus>;
-
 // .strict() rejects a JWK carrying "d", so an agent can never hand us its private key by mistake.
 export const Ed25519PublicJwk = z.object({
   kty: z.literal("OKP"),
   crv: z.literal("Ed25519"),
-  x: z.string().min(40).max(50),
-}).strict();
-
-/** The agent generates its own keypair and registers only the public half (AP2: mandate carries agent_pk). */
-export const RegisterAgent = z.object({
-  name: z.string().min(1).max(60),
-  public_jwk: Ed25519PublicJwk,
+  x: z.string().min(1),
+  kid: z.string().optional(),
 });
 
-// A type (not an interface) so it satisfies the MongoDB Document constraint in getCollection<T>.
-export type Agent = {
+export const RegisterAgent = z.object({
+  name: z.string().min(1).max(100),
+  public_jwk: Ed25519PublicJwk.optional(),
+  public_key_jwk: Ed25519PublicJwk.optional(),
+});
+
+export const AgentStatus = z.enum(["active", "revoked"]);
+export type AgentStatus = z.infer<typeof AgentStatus>;
+
+export const RegisterAgentInput = RegisterAgent;
+export type RegisterAgentInput = z.infer<typeof RegisterAgentInput>;
+
+export const AgentBadgeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: AgentStatus,
+  public_key_jwk: z.object({
+    kty: z.literal("OKP"),
+    crv: z.literal("Ed25519"),
+    x: z.string(),
+    kid: z.string(),
+  }),
+  key_fingerprint: z.string(),
+  created_at: z.string(),
+  revoked_at: z.string().nullable().optional(),
+});
+export type AgentBadge = z.infer<typeof AgentBadgeSchema>;
+
+export interface Agent {
   id: string;
   name: string;
-  public_jwk: z.infer<typeof Ed25519PublicJwk>;
+  public_jwk?: any;
+  public_key_jwk?: any;
+  key_fingerprint?: string;
   status: AgentStatus;
   created_at: string;
-};
+}
+
+export const JWKSResponse = z.object({
+  keys: z.array(z.record(z.string(), z.any())),
+});
+export type JWKSResponse = z.infer<typeof JWKSResponse>;
