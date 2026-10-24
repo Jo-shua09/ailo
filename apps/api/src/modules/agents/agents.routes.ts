@@ -20,13 +20,11 @@ export function agentsRouter(deps?: { agents?: AgentRepository; ownerAuth?: Requ
 
   router.post("/agents", auth, validate({ body: RegisterAgent }), async (req, res, next) => {
     try {
-      if (deps?.agents) {
-        const input = req.body as any;
-        const jwk = input.public_jwk ?? input.public_key_jwk;
-        if (jwk) {
-          const created = await deps.agents.create({ name: input.name, public_jwk: jwk });
-          return res.status(201).json(view(created));
-        }
+      const input = req.body as any;
+      const jwk = input.public_jwk ?? input.public_key_jwk ?? input.public_key;
+      if (deps?.agents && jwk) {
+        const created = await deps.agents.create({ name: input.name, public_jwk: jwk });
+        return res.status(201).json(view(created));
       }
       const result = await agentsService.registerAgent(req.body as RegisterAgentInput);
       res.status(201).json(result);

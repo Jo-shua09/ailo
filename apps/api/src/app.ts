@@ -4,7 +4,7 @@ import { agentSignature } from "./middlewares/agentSignature";
 import { errorHandler } from "./middlewares/errorHandler";
 import { notFound } from "./middlewares/notFound";
 import { ownerAuth } from "./middlewares/ownerAuth";
-import { InMemoryAgentRepository, type AgentRepository } from "./modules/agents/agents.repository";
+import { InMemoryAgentRepository, agentsRepository, type AgentRepository } from "./modules/agents/agents.repository";
 import { jwksRouter } from "./modules/agents/agents.routes";
 import type { GeneratePolicy } from "./modules/mandates/mandates.service";
 import { buildV1 } from "./routes/v1";
@@ -23,10 +23,20 @@ const noPolicyModel: GeneratePolicy = async () => {
 };
 
 export function createApp(deps: AppDeps = {}) {
-  const agents = deps.agents ?? new InMemoryAgentRepository();
+  const agents = deps.agents ?? agentsRepository;
   const secret = deps.sessionSecret ? new TextEncoder().encode(deps.sessionSecret) : randomBytes(32);
 
   const app = express();
+  // CORS support for console and tools
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-korapay-signature, Idempotency-Key");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+    next();
+  });
   // One proxy in front (ngrok or the host), so req.ip is the real client and lockouts stay per person.
   app.set("trust proxy", 1);
   // Keep the raw bytes: agent signatures hash the body, and the Kora webhook HMAC needs it too.

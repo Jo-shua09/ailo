@@ -7,7 +7,7 @@ const Env = z.object({
   PUBLIC_BASE_URL: z.url(),
   DATABASE_URL: z.string().optional(),
   MONGODB_URI: z.string().default("mongodb://localhost:27017/ailo"),
-  KORA_MODE: z.enum(["test", "live"]).default("test"),
+  KORA_MODE: z.enum(["test", "live", "simulated"]).default("test"),
   KORA_BASE_URL: z.url(),
   KORA_SECRET_KEY: z.string().min(1),
   KORA_WEBHOOK_PATH: z.string().default("/v1/webhooks/kora"),
