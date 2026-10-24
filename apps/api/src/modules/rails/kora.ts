@@ -23,6 +23,10 @@ export class KoraRail implements PayoutRail {
   }
 
   async payout(params: PayoutParams): Promise<RailPayoutResult> {
+    // Never fall back to a default account: money would go to whoever owns it.
+    if (!params.destination_bank_code || !params.destination_account_number) {
+      return { reference: params.reference, status: "failed", error: `No payout account on file for ${params.payee_id}` };
+    }
     const notificationUrl = `${env.PUBLIC_BASE_URL}${env.KORA_WEBHOOK_PATH}`;
     const amountNaira = (params.amount_kobo / 100).toFixed(2);
 
@@ -41,8 +45,8 @@ export class KoraRail implements PayoutRail {
         currency: "NGN",
         narration: params.narration ?? `Ailo: ${params.payment_id}`,
         bank_account: {
-          bank: params.destination_bank_code ?? "044",
-          account: params.destination_account_number ?? "0690000031",
+          bank: params.destination_bank_code,
+          account: params.destination_account_number,
         },
         customer: {
           name: params.payee_name,
@@ -107,13 +111,10 @@ export class KoraRail implements PayoutRail {
 
   async query(reference: string): Promise<RailQueryResult> {
     try {
-      const res = await fetch(`${this.baseUrl}/transactions/query`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.secretKey}`,
-        },
-        body: JSON.stringify({ reference }),
+      // Kora "Verify Payout Transaction": GET /transactions/:transactionReference (official API collection).
+      const res = await fetch(`${this.baseUrl}/transactions/${encodeURIComponent(reference)}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${this.secretKey}` },
       });
 
       if (!res.ok) {
