@@ -1,0 +1,29 @@
+# Runs on every push and PR, on Windows and Linux. A lockfile that only installs on one OS,
+# or a failing test, shows up as a red check before it reaches main.
+name: CI
+
+on:
+  push:
+    branches: [main, backend]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck -w @ailo/api
+      - run: npm test
+      - uses: astral-sh/setup-uv@v6
+      - name: Agent tests (Python signs, TypeScript verifies)
+        working-directory: apps/agent
+        run: uv run pytest -q

@@ -1,0 +1,6 @@
+# Store and check out text with LF on every OS (Windows + macOS team), so files never flip line endings.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary

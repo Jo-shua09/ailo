@@ -270,7 +270,7 @@ Chosen on merit and verified against npm/PyPI on 23 Oct 2026 (details: `pau/ailo
 |-------|--------|
 | Repo | npm workspaces monorepo: `packages/core` (contracts, money, states), `packages/till`, `apps/api`, `apps/console`, `apps/shop`, `apps/agent` |
 | API | TypeScript, Express 5, feature modules (`*.routes/service/repository/dto/test`), zod 4 |
-| Database | Hosted Postgres, Drizzle ORM (`.for('update')` row locks) |
+| Database | MongoDB (official `mongodb` driver, `db/mongo.ts`, in-memory fallback for tests). Ledger reserve is serialized in-process so concurrent payments cannot overspend (shortcut: one API instance; with several, move to an atomic conditional update on a wallet document) |
 | AI (API) | Vercel AI SDK, provider-agnostic: `LLM_PROVIDER=google\|openai\|anthropic`. Default Gemini: `gemini-3.5-flash-lite` (Second Look, `maxRetries: 0`, 1.8 s timeout), `gemini-3.8-flash` (Spec Gate) |
 | AI (agent) | Python, Pydantic AI (model string `provider:model`) + MCP tools |
 | Identity | jose, Ed25519 signed requests + JWKS |

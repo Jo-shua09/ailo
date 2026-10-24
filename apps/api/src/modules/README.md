@@ -7,7 +7,7 @@ through their exported service functions. File pattern per module:
 <module>/
 ├── <module>.routes.ts       Express router (mounted in routes/v1/index.ts)
 ├── <module>.service.ts      business logic, no req/res
-├── <module>.repository.ts   database access (Drizzle), only if the module stores data
+├── <module>.repository.ts   database access (MongoDB via db/mongo.ts), only if the module stores data
 ├── <module>.dto.ts          zod schemas for this module's inputs (shared shapes come from @ailo/core)
 └── <module>.test.ts         tests next to the code
 ```

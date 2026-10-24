@@ -36,7 +36,7 @@ ailo/
 
 ## Stack
 
-- TypeScript: Express 5, Drizzle ORM on hosted Postgres, zod 4, Vercel AI SDK (Gemini by default; OpenAI or Anthropic via `LLM_PROVIDER`), jose (Ed25519)
+- TypeScript: Express 5, MongoDB (official driver; in-memory fallback for tests), zod 4, Vercel AI SDK (Gemini by default; OpenAI or Anthropic via `LLM_PROVIDER`), jose (Ed25519)
 - Frontend: Next.js 16, React Query, MSW, Zustand, Tailwind 4, shadcn/ui
 - Python agent: Pydantic AI, MCP
 - Payments: Kora sandbox (REST, no SDK)
