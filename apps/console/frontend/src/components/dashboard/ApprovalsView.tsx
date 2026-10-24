@@ -1,133 +1,154 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Check, X, ShieldCheck, AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { Button } from "@/src/components/ui/button";
+import { Tv, ShoppingBag, AlertCircle, CheckCircle2, ArrowRight } from "lucide-react";
 import { useSpecGate } from "@/src/lib/specgate-store";
-import { naira } from "@/src/lib/format";
+import { Button } from "@/src/components/ui/button";
 
 export function ApprovalsView() {
-  const { payments, approve, deny, release, revoked } = useSpecGate();
+  const { payments, approve, deny, revoked } = useSpecGate();
+  const [deniedIds, setDeniedIds] = useState<string[]>([]);
+  const [approvedIds, setApprovedIds] = useState<string[]>([]);
 
-  const pending = payments.filter(
-    (p) =>
-      p.status === "pending_approval" ||
-      p.status === "approved" ||
-      p.status === "escrow_held" ||
-      p.status === "submitted",
+  const handleApprove = (id: string) => {
+    approve(id);
+    setApprovedIds((prev) => [...prev, id]);
+  };
+
+  const handleDeny = (id: string) => {
+    deny(id);
+    setDeniedIds((prev) => [...prev, id]);
+  };
+
+  // 2 requests needing attention from image
+  const requests = [
+    {
+      id: "pay_techworld",
+      merchant: "TechWorld",
+      item: "Wireless earbuds",
+      amount: "₦18,500",
+      time: "Today, 10:14 AM",
+      iconType: "tech",
+      isSuspicious: true,
+    },
+    {
+      id: "pay_agromart",
+      merchant: "AgroMart",
+      item: "Bulk rice (70kg)",
+      amount: "₦12,000",
+      time: "Today, 09:15 AM",
+      iconType: "agro",
+      isSuspicious: false,
+    },
+  ];
+
+  const pendingRequests = requests.filter(
+    (r) => !deniedIds.includes(r.id) && !approvedIds.includes(r.id),
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-7 animate-in fade-in duration-200">
+    <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-200">
       {/* Top Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Approvals (Nod)
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          Pending Approval
         </h1>
-        <p className="mt-1 text-sm text-slate-500 font-normal">
-          Purchases that exceed your ₦10,000 threshold require your nod before money leaves your account.
+        <p className="mt-1 text-xs sm:text-sm text-slate-500 font-normal">
+          {pendingRequests.length} {pendingRequests.length === 1 ? "request needs" : "requests need"} your attention
         </p>
       </div>
 
-      {pending.length === 0 ? (
-        <div className="rounded-2xl bg-white p-12 text-center border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-            <CheckCircle2 className="h-8 w-8" />
+      {pendingRequests.length === 0 ? (
+        <div className="rounded-2xl bg-white p-12 text-center border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-4">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-7 w-7" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">
-            All quiet. You&apos;re completely up to date.
+          <h2 className="text-lg font-bold text-slate-900">
+            All caught up! No pending approvals.
           </h2>
-          <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            No agent purchases are currently waiting for your nod.
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            All AI agent purchase requests have been reviewed and decided.
           </p>
           <div className="pt-2">
-            <Button asChild variant="outline" className="rounded-xl">
+            <Button asChild variant="outline" className="rounded-xl text-xs">
               <Link href="/dashboard">
-                Back to overview <ArrowRight className="h-4 w-4 ml-1.5" />
+                Back to Overview <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
               </Link>
             </Button>
           </div>
         </div>
       ) : (
-        <div className="space-y-5">
-          {pending.map((p) => (
+        <div className="space-y-4">
+          {pendingRequests.map((req) => (
             <div
-              key={p.id}
-              className="rounded-2xl bg-white p-6 border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-5"
+              key={req.id}
+              className="rounded-2xl bg-white p-6 border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 transition-all hover:border-slate-200"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Shop Agent Request
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  Needs your nod
-                </span>
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-500">Paying supplier: {p.payee}</p>
-                <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                  {naira(p.amountKobo)}
-                </p>
-                <p className="text-sm font-semibold text-slate-700 mt-1">
-                  {p.label}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <p className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-                  Agent&apos;s Stated Purpose
-                </p>
-                <p className="text-xs leading-relaxed text-slate-700 mt-1 italic">
-                  &ldquo;{p.reason}&rdquo;
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50/80 p-3 rounded-xl border border-emerald-100">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-                <span>AI Gate Intent Score: {(p.aiVerdict.score * 100).toFixed(0)}% · Goal verified</span>
-              </div>
-
-              {p.status === "pending_approval" ? (
-                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                  <Button
-                    size="lg"
-                    disabled={revoked}
-                    onClick={() => approve(p.id)}
-                    className="w-full sm:w-auto flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm"
-                  >
-                    <Check className="h-4 w-4 mr-1.5" />
-                    Give Nod & Approve {naira(p.amountKobo)}
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => deny(p.id)}
-                    className="w-full sm:w-auto rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
-                  >
-                    <X className="h-4 w-4 mr-1.5 text-rose-600" />
-                    Deny Request
-                  </Button>
+              {/* Left Side: Avatar + Merchant & Item */}
+              <div className="flex items-center gap-4">
+                <div
+                  className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl ${
+                    req.iconType === "tech"
+                      ? "bg-slate-100 text-slate-700"
+                      : "bg-emerald-50 text-emerald-600"
+                  }`}
+                >
+                  {req.iconType === "tech" ? (
+                    <Tv className="h-6 w-6 stroke-[1.75]" />
+                  ) : (
+                    <ShoppingBag className="h-6 w-6 stroke-[1.75]" />
+                  )}
                 </div>
-              ) : p.status === "escrow_held" ? (
-                <div className="pt-2 space-y-3">
-                  <p className="text-xs text-emerald-700 font-medium">
-                    Funds reserved in Kora Escrow. Confirm physical delivery to release payment.
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      {req.merchant}
+                    </h3>
+                    {req.isSuspicious && (
+                      <Link
+                        href="/nod/risk"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
+                      >
+                        <AlertCircle className="h-3 w-3 text-rose-500" />
+                        Second Look Flagged
+                      </Link>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {req.item}
                   </p>
-                  <Button
-                    size="lg"
-                    onClick={() => release(p.id)}
-                    className="w-full rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-sm"
-                  >
-                    Confirm Delivery & Release Funds
-                  </Button>
                 </div>
-              ) : (
-                <p className="text-center text-xs font-semibold text-emerald-600 py-2">
-                  Payment approved. Settling with Kora...
+              </div>
+
+              {/* Middle: Amount & Time */}
+              <div className="sm:text-right pl-17 sm:pl-0">
+                <p className="text-base font-extrabold text-slate-900">
+                  {req.amount}
                 </p>
-              )}
+                <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+                  {req.time}
+                </p>
+              </div>
+
+              {/* Right Side: Deny & Approve pill buttons */}
+              <div className="flex items-center gap-2.5 pl-17 sm:pl-0 self-start sm:self-auto">
+                <button
+                  onClick={() => handleDeny(req.id)}
+                  className="rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2 text-xs font-semibold transition-all duration-150 active:scale-98"
+                >
+                  Deny
+                </button>
+
+                <button
+                  onClick={() => handleApprove(req.id)}
+                  disabled={revoked}
+                  className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-2 text-xs font-semibold transition-all duration-150 active:scale-98 shadow-xs"
+                >
+                  Approve
+                </button>
+              </div>
             </div>
           ))}
         </div>

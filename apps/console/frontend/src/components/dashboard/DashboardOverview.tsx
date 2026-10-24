@@ -216,12 +216,12 @@ export function DashboardOverview() {
                   <p className="text-xs font-medium text-slate-600">
                     {shopAgent.spentThisWeek}
                   </p>
-                  <button
-                    onClick={() => setSelectedAgent(shopAgent)}
-                    className="mt-3.5 w-full rounded-xl bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 transition-colors text-center"
+                  <Link
+                    href={`/agents/${shopAgent.id}`}
+                    className="mt-3.5 block w-full rounded-xl bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 transition-colors text-center"
                   >
                     View details
-                  </button>
+                  </Link>
                 </div>
               </div>
             )}
@@ -273,12 +273,12 @@ export function DashboardOverview() {
                   <p className="text-xs font-medium text-slate-600">
                     {researchAgent.spentThisWeek}
                   </p>
-                  <button
-                    onClick={() => setSelectedAgent(researchAgent)}
-                    className="mt-3.5 w-full rounded-xl bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 transition-colors text-center"
+                  <Link
+                    href={`/agents/${researchAgent.id}`}
+                    className="mt-3.5 block w-full rounded-xl bg-slate-50 hover:bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 transition-colors text-center"
                   >
                     View details
-                  </button>
+                  </Link>
                 </div>
               </div>
             )}

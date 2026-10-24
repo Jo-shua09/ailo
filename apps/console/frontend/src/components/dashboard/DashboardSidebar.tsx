@@ -124,7 +124,7 @@ export function DashboardSidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-white truncate group-hover:text-emerald-300 transition-colors">
-              Chidi Charles
+              Chidi Okeke
             </p>
             <p className="text-xs text-slate-400 truncate mt-0.5">
               Business Owner

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, Suspense, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -44,7 +44,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SpecGateProvider>
-        <Shell>{children}</Shell>
+        <Suspense fallback={<div className="min-h-screen bg-[#f4f6f9]" />}>
+          <Shell>{children}</Shell>
+        </Suspense>
       </SpecGateProvider>
     </QueryClientProvider>
   );

@@ -54,7 +54,7 @@ export function SettingsView() {
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-slate-900">Chidi Charles</h3>
+            <h3 className="text-base font-bold text-slate-900">Chidi Okeke</h3>
             <p className="text-xs text-slate-500">Business Owner & Admin · Lagos, Nigeria</p>
             <p className="text-xs text-emerald-600 font-medium">Verified Ailo Account · Kora Settlement Active</p>
           </div>

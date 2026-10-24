@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Plus, ChevronRight } from "lucide-react";
-import { Button } from "@/src/components/ui/button";
 import { useSpecGate, type Agent } from "@/src/lib/specgate-store";
 import { CreateAgentDialog } from "./CreateAgentDialog";
-import { AgentDetailModal } from "./AgentDetailModal";
 
 export function AgentsView() {
   const { agents, revoked } = useSpecGate();
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-7 animate-in fade-in duration-200">
@@ -35,63 +33,65 @@ export function AgentsView() {
         </button>
       </div>
 
-      {/* Agents List (Full width stacked cards) */}
+      {/* Agents List (Full width stacked cards linking to Agent Identity) */}
       <div className="space-y-4">
         {agents.map((agent) => {
           const isActive = agent.status === "active" && !revoked;
 
           return (
-            <div
+            <Link
               key={agent.id}
-              onClick={() => setSelectedAgent(agent)}
-              className="group cursor-pointer rounded-2xl bg-white p-5 border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+              href={`/agents/${agent.id}`}
+              className="group block rounded-2xl bg-white p-5 border border-slate-100/90 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] transition-all"
             >
-              {/* Left side: Avatar + Title & Subtitle */}
-              <div className="flex items-center gap-4">
-                <div className="relative h-14 w-14 shrink-0 rounded-full overflow-hidden bg-slate-100 ring-4 ring-slate-50 shadow-inner group-hover:scale-102 transition-transform">
-                  <Image
-                    src={agent.avatar}
-                    alt={agent.name}
-                    width={56}
-                    height={56}
-                    className="object-cover h-full w-full"
-                  />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* Left side: Avatar + Title & Subtitle */}
+                <div className="flex items-center gap-4">
+                  <div className="relative h-14 w-14 shrink-0 rounded-full overflow-hidden bg-slate-100 ring-4 ring-slate-50 shadow-inner group-hover:scale-102 transition-transform">
+                    <Image
+                      src={agent.avatar}
+                      alt={agent.name}
+                      width={56}
+                      height={56}
+                      className="object-cover h-full w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                      {agent.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {agent.role}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    {agent.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {agent.role}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right side: Status badge + Spent this week + Chevron */}
-              <div className="flex items-center justify-between sm:justify-end gap-5 pl-18 sm:pl-0">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                    isActive
-                      ? "text-emerald-600 bg-emerald-50/80"
-                      : "text-rose-600 bg-rose-50/80"
-                  }`}
-                >
+                {/* Right side: Status badge + Spent this week + Chevron */}
+                <div className="flex items-center justify-between sm:justify-end gap-5 pl-18 sm:pl-0">
                   <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      isActive ? "bg-emerald-500" : "bg-rose-500"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                      isActive
+                        ? "text-emerald-600 bg-emerald-50/80"
+                        : "text-rose-600 bg-rose-50/80"
                     }`}
-                  />
-                  {isActive ? "Active" : "Paused"}
-                </span>
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isActive ? "bg-emerald-500" : "bg-rose-500"
+                      }`}
+                    />
+                    {isActive ? "Active" : "Paused"}
+                  </span>
 
-                <span className="text-xs font-medium text-slate-600">
-                  {agent.spentThisWeek}
-                </span>
+                  <span className="text-xs font-medium text-slate-600">
+                    {agent.spentThisWeek}
+                  </span>
 
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all" />
+                </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -100,12 +100,6 @@ export function AgentsView() {
       <CreateAgentDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-      />
-
-      {/* Agent Detail Modal */}
-      <AgentDetailModal
-        agent={selectedAgent}
-        onClose={() => setSelectedAgent(null)}
       />
     </div>
   );
