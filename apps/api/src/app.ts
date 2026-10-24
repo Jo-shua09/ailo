@@ -4,7 +4,7 @@ import { agentSignature } from "./middlewares/agentSignature";
 import { errorHandler } from "./middlewares/errorHandler";
 import { notFound } from "./middlewares/notFound";
 import { ownerAuth } from "./middlewares/ownerAuth";
-import { InMemoryAgentRepository, type AgentRepository } from "./modules/agents/agents.repository";
+import { agentsRepository, type AgentRepository } from "./modules/agents/agents.repository";
 import { jwksRouter } from "./modules/agents/agents.routes";
 import { buildV1 } from "./routes/v1";
 
@@ -15,7 +15,8 @@ export interface AppDeps {
 }
 
 export function createApp(deps: AppDeps = {}) {
-  const agents = deps.agents ?? new InMemoryAgentRepository();
+  // One shared agent store for registration, signature checks and payments.
+  const agents = deps.agents ?? agentsRepository;
   const secret = deps.sessionSecret ? new TextEncoder().encode(deps.sessionSecret) : randomBytes(32);
 
   const app = express();
