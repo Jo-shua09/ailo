@@ -1,6 +1,9 @@
 import { Payment, Approval, Agent, LedgerBalances } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/v1";
+const API_URL =
+  (process.env.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
+    : "https://ailo-dx6f.onrender.com") + "/v1";
 
 class AiloApiClient {
   private token: string | null = null;

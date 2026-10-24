@@ -8,7 +8,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:4000",
+      "value": "https://ailo-dx6f.onrender.com",
       "type": "string"
     },
     {

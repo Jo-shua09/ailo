@@ -25,10 +25,11 @@ export class AgentsService {
     let publicJwk: any;
     let privateJwk: jose.JWK | undefined;
 
-    if (input.public_key_jwk) {
+    const keyInput = input.public_key_jwk ?? input.public_jwk ?? input.public_key;
+    if (keyInput) {
       publicJwk = {
-        ...input.public_key_jwk,
-        kid: input.public_key_jwk.kid ?? agentId,
+        ...keyInput,
+        kid: keyInput.kid ?? agentId,
       };
     } else {
       // Generate Ed25519 keypair

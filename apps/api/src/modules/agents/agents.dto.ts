@@ -12,6 +12,7 @@ export const RegisterAgent = z.object({
   name: z.string().min(1).max(100),
   public_jwk: Ed25519PublicJwk.optional(),
   public_key_jwk: Ed25519PublicJwk.optional(),
+  public_key: Ed25519PublicJwk.optional(),
 });
 
 export const AgentStatus = z.enum(["active", "revoked"]);
