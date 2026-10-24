@@ -6,13 +6,21 @@ import { notFound } from "./middlewares/notFound";
 import { ownerAuth } from "./middlewares/ownerAuth";
 import { InMemoryAgentRepository, type AgentRepository } from "./modules/agents/agents.repository";
 import { jwksRouter } from "./modules/agents/agents.routes";
+import type { GeneratePolicy } from "./modules/mandates/mandates.service";
 import { buildV1 } from "./routes/v1";
+import { AppError } from "./shared/AppError";
 
 export interface AppDeps {
   agents?: AgentRepository;
   ownerPin?: string;
   sessionSecret?: string;
+  /** Spec Gate model (server.ts builds it from env). Without one, compile answers 503. */
+  generatePolicy?: GeneratePolicy;
 }
+
+const noPolicyModel: GeneratePolicy = async () => {
+  throw new AppError(503, "AI_NOT_CONFIGURED", "No AI model is configured for Spec Gate");
+};
 
 export function createApp(deps: AppDeps = {}) {
   const agents = deps.agents ?? new InMemoryAgentRepository();
@@ -30,6 +38,7 @@ export function createApp(deps: AppDeps = {}) {
     secret,
     ownerAuth: ownerAuth(secret),
     agentAuth: agentSignature({ agents }),
+    generatePolicy: deps.generatePolicy ?? noPolicyModel,
   }));
   app.use(notFound);
   app.use(errorHandler);

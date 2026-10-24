@@ -1,10 +1,10 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { PaymentRequest } from "@ailo/core";
 import { validate } from "../../middlewares/validate";
 import { idempotency } from "../../middlewares/idempotency";
-import { agentAuth } from "../../middlewares/agentAuth";
 import { paymentsService } from "./payments.service";
 
+export function paymentsRouter(agentAuth: RequestHandler) {
 const router = Router();
 
 router.get("/payments", async (_req, res, next) => {
@@ -25,15 +25,16 @@ router.get("/payments/:id", async (req, res, next) => {
   }
 });
 
+// Same signed agent token as /agents/me (Authorization: Agent <jwt>). It runs first, so
+// unsigned requests never touch idempotency storage.
 router.post(
   "/payments",
+  agentAuth,
   idempotency({ required: true }),
   validate({ body: PaymentRequest }),
-  agentAuth(),
   async (req, res, next) => {
     try {
-      const agent = (req as any).agent ?? { id: "agt_default", name: "Shop agent" };
-      const result = await paymentsService.processPayment(agent, req.body as PaymentRequest);
+      const result = await paymentsService.processPayment(req.agent!, req.body as PaymentRequest);
       res.status(result.payment.status === "blocked" ? 400 : 201).json(result);
     } catch (err) {
       next(err);
@@ -41,4 +42,5 @@ router.post(
   }
 );
 
-export default router;
+return router;
+}

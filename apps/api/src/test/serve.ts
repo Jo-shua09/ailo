@@ -2,6 +2,6 @@
 import type { AddressInfo } from "node:net";
 import { createApp } from "../app";
 
-const server = createApp({ ownerPin: "2468", sessionSecret: "s".repeat(32) }).listen(0, () => {
+const server = createApp({ ownerPin: "246810", sessionSecret: "s".repeat(32) }).listen(0, () => {
   console.log(JSON.stringify({ port: (server.address() as AddressInfo).port }));
 });
