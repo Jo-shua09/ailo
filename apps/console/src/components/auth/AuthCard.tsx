@@ -220,6 +220,7 @@ export function AuthCard({ initialMode = "login" }: { initialMode?: "login" | "s
               src="/images/login-mascot.jpg"
               alt="Ailo AI agent robot mascot with shield and security tiles"
               fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
               className="object-cover"
               priority
             />

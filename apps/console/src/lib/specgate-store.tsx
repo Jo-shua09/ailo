@@ -85,7 +85,7 @@ type Store = {
   reload: () => Promise<void>;
   ledger: LedgerEntry[];
   agents: Agent[];
-  addAgent: (agent: Agent) => void;
+  registerAgent: (name: string, publicKeyX: string) => Promise<void>;
   toggleAgentStatus: (id: string) => void;
   frames: ProtoFrame[];
   notices: PhoneNotice[];
@@ -196,9 +196,16 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const later = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
   const done = (n: number) => setCompleted((c) => (c.includes(n) ? c : [...c, n]));
 
-  const addAgent = useCallback((agent: Agent) => {
-    setAgents((prev) => [...prev, agent]);
-  }, []);
+  const registerAgent = useCallback(async (name: string, publicKeyX: string) => {
+    await ownerFetch("/v1/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        public_jwk: { kty: "OKP", crv: "Ed25519", x: publicKeyX },
+      }),
+    });
+    await reload();
+  }, [reload]);
 
   const toggleAgentStatus = useCallback((id: string) => {
     void ownerFetch(`/v1/agents/${id}/brake`, { method: "POST" }).then(reload);
@@ -294,7 +301,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       reload,
       ledger,
       agents,
-      addAgent,
+      registerAgent,
       toggleAgentStatus,
       frames,
       notices,
@@ -326,7 +333,7 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       reload,
       ledger,
       agents,
-      addAgent,
+      registerAgent,
       toggleAgentStatus,
       frames,
       notices,

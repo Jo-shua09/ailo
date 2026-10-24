@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { ShoppingBag, CheckCircle2, ArrowRight } from "lucide-react";
 import { useSpecGate } from "@/src/lib/specgate-store";
@@ -10,6 +10,10 @@ import { DataStatus } from "./DataStatus";
 export function ApprovalsView() {
   const { approvals, payments, approve, deny, revoked, loading, loadError, reload } = useSpecGate();
 
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
   const handleApprove = (id: string) => {
     void approve(id);
   };
@@ -18,7 +22,7 @@ export function ApprovalsView() {
     void deny(id);
   };
 
-  const pendingRequests = approvals.filter((approval) => approval.status === "pending").map((approval) => {
+  const pendingRequests = approvals.filter((approval) => ["pending", "pending_approval"].includes(String(approval.status || "pending").toLowerCase())).map((approval) => {
     const payment = payments.find((item) => item.id === approval.payment_id);
     return { id: approval.id, merchant: approval.payee_name, item: payment?.label || "Payment request", amount: `₦${(approval.amount_kobo / 100).toLocaleString()}`, time: new Date(approval.created_at).toLocaleString(), isSuspicious: payment?.aiVerdict.action === "block" };
   });
