@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { ShoppingBag, ShieldCheck, ArrowRight, Eye, Check } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
@@ -48,7 +49,7 @@ export default function Shop() {
         ].map((p) => (
           <section key={p.step} className="overflow-hidden rounded-md border border-border bg-card">
             <div className="border-b border-border">
-              <img src={groceryImage} alt={p.name} loading="lazy" width={1024} height={1024} className="aspect-[4/3] w-full object-contain" />
+              <Image src={groceryImage} alt={p.name} width={1024} height={1024} className="aspect-[4/3] w-full object-contain" />
             </div>
             <div className="p-6">
               <h2 className="text-xl font-semibold">{p.name}</h2>
