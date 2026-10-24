@@ -23,9 +23,9 @@ const Env = z.object({
   CONSOLE_ORIGIN: z.url().default("http://localhost:3000"),
 });
 
-const testDefaults = process.env.NODE_ENV === "test" ? {
+const devDefaults = process.env.NODE_ENV !== "production" ? {
   PUBLIC_BASE_URL: "http://localhost:4000",
-  MONGODB_URI: "mongodb://localhost:27017/ailo_test",
+  MONGODB_URI: "mongodb://localhost:27017/ailo",
   KORA_BASE_URL: "https://api.korapay.com/merchant/api/v1",
   KORA_SECRET_KEY: "test_kora_secret_key",
   LLM_MODEL_FAST: "gemini-3.5-flash-lite",
@@ -35,7 +35,7 @@ const testDefaults = process.env.NODE_ENV === "test" ? {
   CONSOLE_ORIGIN: "http://localhost:3000",
 } : {};
 
-export const env = Env.parse({ ...testDefaults, ...process.env });
+export const env = Env.parse({ ...devDefaults, ...process.env });
 
 // The Vercel AI SDK's Google provider reads this name, not GEMINI_API_KEY.
 if (env.GEMINI_API_KEY) process.env.GOOGLE_GENERATIVE_AI_API_KEY ??= env.GEMINI_API_KEY;
