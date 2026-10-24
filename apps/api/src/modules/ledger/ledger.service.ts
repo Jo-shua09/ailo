@@ -2,6 +2,16 @@ import { AppError } from "../../shared/AppError";
 import { ledgerRepository, LedgerRepository } from "./ledger.repository";
 import type { LedgerBalancesResponse, LedgerHold } from "./ledger.dto";
 
+// Check-then-hold must be one uninterrupted step, or two payments can both pass the balance check.
+// shortcut: in-process lock, correct for one API process; with several instances use an atomic
+// conditional update instead (Modern Treasury-style balance filter: available >= amount in the write itself).
+let reserveLock: Promise<unknown> = Promise.resolve();
+function exclusively<T>(work: () => Promise<T>): Promise<T> {
+  const run = reserveLock.then(work, work);
+  reserveLock = run.catch(() => undefined);
+  return run;
+}
+
 export class LedgerService {
   constructor(private repo: LedgerRepository = ledgerRepository) {}
 
@@ -27,27 +37,29 @@ export class LedgerService {
       throw new AppError(400, "INVALID_AMOUNT", "Reserve amount must be positive");
     }
 
-    const balances = await this.repo.getBalances();
-    if (balances.available_balance < amount_kobo) {
-      throw new AppError(
-        400,
-        "INSUFFICIENT_FUNDS",
-        `Insufficient available balance: ${balances.available_balance} kobo available, ${amount_kobo} kobo requested`,
-        { available_balance: balances.available_balance, requested_amount: amount_kobo },
-      );
-    }
+    return exclusively(async () => {
+      const balances = await this.repo.getBalances();
+      if (balances.available_balance < amount_kobo) {
+        throw new AppError(
+          400,
+          "INSUFFICIENT_FUNDS",
+          `Insufficient available balance: ${balances.available_balance} kobo available, ${amount_kobo} kobo requested`,
+          { available_balance: balances.available_balance, requested_amount: amount_kobo },
+        );
+      }
 
-    const hold: LedgerHold = {
-      id: `hld_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      payment_id,
-      amount_kobo,
-      status: "active",
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
-    };
+      const hold: LedgerHold = {
+        id: `hld_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        payment_id,
+        amount_kobo,
+        status: "active",
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+      };
 
-    await this.repo.createHold(hold);
-    return hold;
+      await this.repo.createHold(hold);
+      return hold;
+    });
   }
 
   async postHold(payment_id: string, description = "Payment settlement"): Promise<void> {
