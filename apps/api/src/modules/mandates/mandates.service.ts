@@ -1,5 +1,6 @@
 import { evaluatePolicy, SpendPolicy } from "@ailo/core";
 import { AppError } from "../../shared/AppError";
+import { listPayeeIds } from "../payees/payees";
 import { paymentsRepository } from "../payments/payments.repository";
 import type { Mandate } from "./mandates.dto";
 import { mandatesRepository } from "./mandates.repository";
@@ -15,6 +16,9 @@ export async function compile(english: string, deps: { generatePolicy: GenerateP
   if (!parsed.success) {
     throw new AppError(422, "COMPILE_FAILED", "Could not turn that rule into a valid policy. Try rewording it.", readableIssues(parsed.error));
   }
+  // A rule naming no shops means "my usual shops" (owner's decision, 24 Oct): fill them in here so the
+  // owner sees the list in the compiled rule before saving, instead of every payment needing a Nod.
+  if (parsed.data.allowed_payees.length === 0) return { ...parsed.data, allowed_payees: listPayeeIds() };
   return parsed.data;
 }
 
