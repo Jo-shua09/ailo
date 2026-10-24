@@ -43,7 +43,7 @@ describe("KoraRail", () => {
           json: async () => ({ status: false, message: "Duplicate Transaction Reference" }),
         };
       }
-      if (url.includes("/transactions/query")) {
+      if (url.includes("/transactions/AL-pay_02")) {
         queryCalled = true;
         return {
           ok: true,

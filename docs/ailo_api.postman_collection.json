@@ -317,6 +317,154 @@
       ]
     },
     {
+      "name": "4b. Spec Gate (spending rules)",
+      "description": "Save a rule BEFORE the agent pays: with no saved rule every payment is blocked. Payments follow the latest saved version.",
+      "item": [
+        {
+          "name": "Compile Rule (English -> policy, AI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mandates/compile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mandates",
+                "compile"
+              ]
+            },
+            "description": "Real AI call (LLM_MODEL_SMART). Returns a proposed policy only; nothing is saved. Payee ids: payee_mama_ngozi, payee_lagos_logistics. 503 if no AI model is configured.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"english\": \"Groceries from Mama Ngozi only. Up to N20,000 a payment and N50,000 a week. Ask me above N10,000.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Test Rule against recent payments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mandates/test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mandates",
+                "test"
+              ]
+            },
+            "description": "Replays recent payments against a draft policy. Nothing is saved or enforced.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"policy\": {\n    \"allowed_categories\": [\n      \"groceries\"\n    ],\n    \"allowed_payees\": [\n      \"payee_mama_ngozi\"\n    ],\n    \"spending_limits\": [\n      {\n        \"amount_kobo\": 2000000,\n        \"interval\": \"per_payment\"\n      },\n      {\n        \"amount_kobo\": 5000000,\n        \"interval\": \"weekly\"\n      }\n    ],\n    \"nod_above_kobo\": 1000000,\n    \"nod_rolling_payee_24h_kobo\": 1000000,\n    \"expires_at\": \"2030-01-01T00:00:00.000Z\"\n  },\n  \"limit\": 20\n}"
+            }
+          }
+        },
+        {
+          "name": "Save Rule (becomes active)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mandates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mandates"
+              ]
+            },
+            "description": "Saves a new version; no AI call. Amounts are kobo: 2000000 = N20,000. Enforced today: categories, per-payment and weekly limits, payee list and the Nod threshold.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"english\": \"Groceries from Mama Ngozi only. Up to N20,000 a payment and N50,000 a week. Ask me above N10,000.\",\n  \"policy\": {\n    \"allowed_categories\": [\n      \"groceries\"\n    ],\n    \"allowed_payees\": [\n      \"payee_mama_ngozi\"\n    ],\n    \"spending_limits\": [\n      {\n        \"amount_kobo\": 2000000,\n        \"interval\": \"per_payment\"\n      },\n      {\n        \"amount_kobo\": 5000000,\n        \"interval\": \"weekly\"\n      }\n    ],\n    \"nod_above_kobo\": 1000000,\n    \"nod_rolling_payee_24h_kobo\": 1000000,\n    \"expires_at\": \"2030-01-01T00:00:00.000Z\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "List Rules (all versions)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Owner {{owner_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mandates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mandates"
+              ]
+            },
+            "description": "Newest first."
+          }
+        },
+        {
+          "name": "Agent: current rule (signed)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Agent {{agent_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/mandates/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mandates",
+                "current"
+              ]
+            },
+            "description": "What the buyer agent reads first. Fresh agent token: `uv run python -m ailo_agent.signing {{agent_id}} GET /v1/mandates/current`. 404 NO_MANDATE until a rule is saved."
+          }
+        }
+      ]
+    },
+    {
       "name": "5. Payments",
       "item": [
         {
@@ -362,7 +510,7 @@
                 "payments"
               ]
             },
-            "description": "The signature covers the exact body bytes. 1) Save this body (one line, no changes) to apps/agent/body.json. 2) cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} POST /v1/payments body.json 3) Paste the printed 'Agent ...' into agent_token and send within 60 s. Each token works once. Bank details come from the server's payee directory (payee_mama_ngozi, payee_lagos_logistics), never from this body. Optional field: page_text (max 20,000 chars), the shop page the agent acted on, so Second Look can spot a poisoned page. Kora pays out only between N1,000 and N10,000,000, so amount_kobo must be at least 100000."
+            "description": "The signature covers the exact body bytes. 1) Save this body (one line, no changes) to apps/agent/body.json. 2) cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} POST /v1/payments body.json 3) Paste the printed 'Agent ...' into agent_token and send within 60 s. Each token works once. Bank details come from the server's payee directory (payee_mama_ngozi, payee_lagos_logistics), never from this body. Optional field: page_text (max 20,000 chars), the shop page the agent acted on, so Second Look can spot a poisoned page. Kora pays out only between N1,000 and N10,000,000, so amount_kobo must be at least 100000.\n\nA clean payment ends `submitted`: Kora accepted the payout. It becomes `settled` when Kora's webhook arrives (set the webhook URL in the Kora dashboard to {PUBLIC_BASE_URL}/v1/webhooks/kora; Kora's payout API does not take a notification_url) or when you run Square Up."
           }
         },
         {
@@ -645,7 +793,8 @@
                 "ops",
                 "reconcile"
               ]
-            }
+            },
+            "description": "\n\nUse this after a payout to pull the final status from Kora (GET /transactions/:reference) when no webhook has arrived."
           }
         },
         {

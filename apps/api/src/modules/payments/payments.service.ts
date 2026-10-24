@@ -1,15 +1,22 @@
-import { formatNaira, type Check, type Payment, type PaymentRequest, type Receipt, type SpendPolicy } from "@ailo/core";
+import { formatNaira, type Check, type Payment, type PaymentRequest, type Receipt } from "@ailo/core";
 import { AppError } from "../../shared/AppError";
 import { eventsService } from "../events/events.service";
 import { ledgerService } from "../ledger/ledger.service";
 import { approvalsService } from "../approvals/approvals.service";
+import * as mandates from "../mandates/mandates.service";
+import { getPayee } from "../payees/payees";
 import { getPayoutRail } from "../rails";
+
+// Bank details and email come only from the server-side payee directory, never from the agent (PRD 5.9).
+function payoutAccount(payeeId: string) {
+  const payee = getPayee(payeeId);
+  return payee
+    ? { destination_bank_code: payee.bank_code, destination_account_number: payee.account_number, payee_email: payee.email }
+    : {};
+}
 import { paymentsRepository, PaymentsRepository } from "./payments.repository";
-import { DEFAULT_DEMO_POLICY } from "./payments.dto";
 
 export class PaymentsService {
-  private policy: SpendPolicy = DEFAULT_DEMO_POLICY;
-
   constructor(private repo: PaymentsRepository = paymentsRepository) {
     // Connect approval decisions to payment transitions
     approvalsService.setDecisionHandler(async (paymentId, decision) => {
@@ -19,14 +26,6 @@ export class PaymentsService {
         await this.executeDeniedPayment(paymentId);
       }
     });
-  }
-
-  setSpendPolicy(policy: SpendPolicy): void {
-    this.policy = policy;
-  }
-
-  getSpendPolicy(): SpendPolicy {
-    return this.policy;
   }
 
   async listPayments(): Promise<Payment[]> {
@@ -62,26 +61,49 @@ export class PaymentsService {
       detail: `Badge verified for agent ${agent.name} (${agent.id})`,
     });
 
+    // Step 2: Deterministic Rules (Spec Gate): the owner's latest saved mandate. No rule, no spending.
+    const mandate = await mandates.current();
     const receipt: Receipt = {
       payment_id: paymentId,
-      policy_version: 1,
+      policy_version: mandate?.version ?? 1, // the contract needs a positive version even when no rule exists
       checks,
     };
 
-    // Step 2: Deterministic Rules (Spec Gate)
-    const isCategoryAllowed = this.policy.allowed_categories.includes(req.category.toLowerCase());
-    const isPayeeAllowed = this.policy.allowed_payees.includes(req.payee_id);
+    if (!mandate) {
+      checks.push({ step: "rules", result: "fail", detail: "No spending rule saved yet: the owner sets one in Spec Gate" });
+      const blockedPayment: Payment = {
+        id: paymentId,
+        agent_id: agent.id,
+        payee_id: req.payee_id,
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
+        amount_kobo: req.amount_kobo,
+        category: req.category,
+        reason: req.reason,
+        verdict: "block",
+        decided_by: "rules",
+        status: "blocked",
+        kora_reference: null,
+        created_at: now,
+      };
+      await this.repo.savePayment(blockedPayment, receipt);
+      eventsService.emitPaymentUpdated(blockedPayment);
+      return { payment: blockedPayment, receipt };
+    }
+    const policy = mandate.policy;
+
+    const isCategoryAllowed = policy.allowed_categories.includes(req.category.toLowerCase());
+    const isPayeeAllowed = policy.allowed_payees.includes(req.payee_id);
 
     const weeklySpent = await this.repo.getWeeklySpend(agent.id);
-    const weeklyLimit = this.policy.spending_limits.find((l) => l.interval === "weekly")?.amount_kobo ?? 5_000_000;
-    const perPaymentLimit = this.policy.spending_limits.find((l) => l.interval === "per_payment")?.amount_kobo ?? 2_000_000;
+    const weeklyLimit = policy.spending_limits.find((l) => l.interval === "weekly")?.amount_kobo ?? 5_000_000;
+    const perPaymentLimit = policy.spending_limits.find((l) => l.interval === "per_payment")?.amount_kobo ?? 2_000_000;
 
     let rulesPassed = true;
     let ruleFailDetail = "";
 
     if (!isCategoryAllowed) {
       rulesPassed = false;
-      ruleFailDetail = `Category "${req.category}" is not in allowed categories: ${this.policy.allowed_categories.join(", ")}`;
+      ruleFailDetail = `Category "${req.category}" is not in allowed categories: ${policy.allowed_categories.join(", ")}`;
     } else if (req.amount_kobo > perPaymentLimit) {
       rulesPassed = false;
       ruleFailDetail = `Amount ${formatNaira(req.amount_kobo)} exceeds single payment limit of ${formatNaira(perPaymentLimit)}`;
@@ -101,7 +123,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -142,7 +164,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -179,7 +201,7 @@ export class PaymentsService {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -208,10 +230,10 @@ export class PaymentsService {
     if (!isPayeeAllowed) {
       needsNod = true;
       nodReason = "new_payee";
-    } else if (req.amount_kobo > this.policy.nod_above_kobo) {
+    } else if (req.amount_kobo > policy.nod_above_kobo) {
       needsNod = true;
       nodReason = "above_threshold";
-    } else if (rollingPayeeSpent + req.amount_kobo > this.policy.nod_rolling_payee_24h_kobo) {
+    } else if (rollingPayeeSpent + req.amount_kobo > policy.nod_rolling_payee_24h_kobo) {
       needsNod = true;
       nodReason = "above_threshold";
     }
@@ -220,14 +242,14 @@ export class PaymentsService {
       checks.push({
         step: "nod",
         result: "pass",
-        detail: `Waiting for owner Nod (${nodReason === "above_threshold" ? `above ${formatNaira(this.policy.nod_above_kobo)}` : "new payee"})`,
+        detail: `Waiting for owner Nod (${nodReason === "above_threshold" ? `above ${formatNaira(policy.nod_above_kobo)}` : "new payee"})`,
       });
 
       const nodPayment: Payment = {
         id: paymentId,
         agent_id: agent.id,
         payee_id: req.payee_id,
-        payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+        payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
         amount_kobo: req.amount_kobo,
         category: req.category,
         reason: req.reason,
@@ -256,7 +278,7 @@ export class PaymentsService {
     checks.push({
       step: "nod",
       result: "skipped",
-      detail: `under ${formatNaira(this.policy.nod_above_kobo)} threshold`,
+      detail: `under ${formatNaira(policy.nod_above_kobo)} threshold`,
     });
 
     // Step 6: Payout through Rails
@@ -266,8 +288,9 @@ export class PaymentsService {
       reference,
       amount_kobo: req.amount_kobo,
       payee_id: req.payee_id,
-      payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+      payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
       narration: req.reason,
+      ...payoutAccount(req.payee_id),
     });
 
     if (payoutResult.status === "settled") {
@@ -296,7 +319,7 @@ export class PaymentsService {
       id: paymentId,
       agent_id: agent.id,
       payee_id: req.payee_id,
-      payee_name: req.payee_id.replace(/^payee_/, "").replace(/_/g, " "),
+      payee_name: getPayee(req.payee_id)?.name ?? req.payee_id,
       amount_kobo: req.amount_kobo,
       category: req.category,
       reason: req.reason,
@@ -331,6 +354,7 @@ export class PaymentsService {
       payee_id: record.payee_id,
       payee_name: record.payee_name,
       narration: record.reason,
+      ...payoutAccount(record.payee_id),
     });
 
     const newChecks: Check[] = [];

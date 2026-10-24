@@ -23,7 +23,6 @@ export class KoraRail implements PayoutRail {
   }
 
   async payout(params: PayoutParams): Promise<RailPayoutResult> {
-    const notificationUrl = `${env.PUBLIC_BASE_URL}${env.KORA_WEBHOOK_PATH}`;
     const amountNaira = (params.amount_kobo / 100).toFixed(2);
 
     // Metadata rules: at most 5 keys, strictly no underscores in key names.
@@ -32,8 +31,6 @@ export class KoraRail implements PayoutRail {
       payeeid: params.payee_id.slice(0, 32),
       rail: "kora",
     };
-
-    const isPublicHttps = notificationUrl.startsWith("https://");
 
     const payload: Record<string, any> = {
       reference: params.reference,
@@ -53,10 +50,8 @@ export class KoraRail implements PayoutRail {
       },
       metadata,
     };
-
-    if (isPublicHttps) {
-      payload.notification_url = notificationUrl;
-    }
+    // No notification_url: Kora's single payout rejects it ("notification_url is not allowed");
+    // payout webhooks go to the URL set in the Kora dashboard.
 
     try {
       const res = await fetch(`${this.baseUrl}/transactions/disburse`, {
@@ -120,13 +115,10 @@ export class KoraRail implements PayoutRail {
 
   async query(reference: string): Promise<RailQueryResult> {
     try {
-      const res = await fetch(`${this.baseUrl}/transactions/query`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.secretKey}`,
-        },
-        body: JSON.stringify({ reference }),
+      // Kora "Verify Payout Transaction": GET /transactions/:transactionReference (official API collection).
+      const res = await fetch(`${this.baseUrl}/transactions/${encodeURIComponent(reference)}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${this.secretKey}` },
       });
 
       if (!res.ok) {

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { resetMemoryDb } from "../../db/mongo";
 import { ledgerService } from "../ledger/ledger.service";
 import { approvalsService } from "../approvals/approvals.service";
+import { mandatesRepository } from "../mandates/mandates.repository";
+import { DEFAULT_DEMO_POLICY } from "./payments.dto";
 import { PaymentsService } from "./payments.service";
 
 describe("PaymentsService", () => {
@@ -11,8 +13,24 @@ describe("PaymentsService", () => {
   beforeEach(async () => {
     resetMemoryDb();
     service = new PaymentsService();
+    // Payments follow the owner's latest saved rule.
+    await mandatesRepository.save("Demo rule", DEFAULT_DEMO_POLICY);
     // Top up wallet for testing: ₦100,000 (10,000,000 kobo)
     await ledgerService.topUpOwnerWallet(10_000_000);
+  });
+
+  it("blocks every payment until the owner saves a rule", async () => {
+    resetMemoryDb();
+    await ledgerService.topUpOwnerWallet(10_000_000);
+    const result = await service.processPayment(mockAgent, {
+      payee_id: "payee_mama_ngozi",
+      amount_kobo: 500000,
+      category: "groceries",
+      reason: "Restock rice",
+    });
+
+    expect(result.payment.status).toBe("blocked");
+    expect(result.receipt.checks.find((c) => c.step === "rules")?.detail).toContain("No spending rule");
   });
 
   it("processes a clean payment under threshold end-to-end to settled with receipt", async () => {

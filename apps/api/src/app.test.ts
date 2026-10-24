@@ -1,9 +1,9 @@
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import * as jose from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "./app";
 import { resetMemoryDb } from "./db/mongo";
+import { newAgentKeys, signRequest } from "./test/agent-signing";
 
 let server: Server;
 let base: string;
@@ -24,6 +24,16 @@ async function getOwnerToken(): Promise<string> {
   });
   const data = (await res.json()) as { token: string };
   return data.token;
+}
+
+async function signedPayment(privateKey: Awaited<ReturnType<typeof newAgentKeys>>["privateKey"], agentId: string, payment: object, idem: string) {
+  const body = JSON.stringify(payment);
+  const sig = await signRequest(privateKey, agentId, { method: "POST", path: "/v1/payments", body });
+  return fetch(`${base}/v1/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": idem, Authorization: `Agent ${sig}` },
+    body,
+  });
 }
 
 describe("Ailo API Engine End-to-End", () => {
@@ -54,58 +64,64 @@ describe("Ailo API Engine End-to-End", () => {
     const topupData = await topupRes.json();
     expect(topupData.balances.owner_wallet).toBe(5_000_000);
 
-    // 2. Register agent (Badge) with owner token
+    // 2. Register agent (Badge): the agent made its own keypair, only the public key is sent.
+    const keys = await newAgentKeys();
     const agentRes = await fetch(`${base}/v1/agents`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Owner ${ownerToken}`,
       },
-      body: JSON.stringify({ name: "Demo Shop Agent" }),
+      body: JSON.stringify({ name: "Demo Shop Agent", public_jwk: keys.publicJwk }),
     });
     expect(agentRes.status).toBe(201);
-    const agentData = await agentRes.json();
-    const agent = agentData.agent ?? agentData;
-    const privateKeyJwk = agentData.private_key_jwk;
+    const agent = await agentRes.json();
     expect(agent.id).toMatch(/^agt_/);
     expect(agent.status).toBe("active");
 
-    // 3. Create signed payment request with Ed25519 Bearer token
-    // If agent was registered without key, generate a test keypair
-    let privateKey: any;
-    if (privateKeyJwk) {
-      privateKey = await jose.importJWK(privateKeyJwk, "EdDSA");
-    } else {
-      const kp = await jose.generateKeyPair("EdDSA", { crv: "Ed25519" });
-      privateKey = kp.privateKey;
-    }
-
-    const nonce = "test_nonce_e2e_001";
-    const token = await new jose.SignJWT({ nonce, timestamp: Date.now() })
-      .setProtectedHeader({ alg: "EdDSA", kid: agent.id })
-      .setSubject(agent.id)
-      .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
-
-    const paymentRes = await fetch(`${base}/v1/payments`, {
+    // 3. Owner saves a spending rule (Spec Gate); the agent reads the same rule.
+    const ruleRes = await fetch(`${base}/v1/mandates`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": "e2e_idem_key_001",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Owner ${ownerToken}` },
       body: JSON.stringify({
-        payee_id: "payee_mama_ngozi",
-        amount_kobo: 850000, // ₦8,500.00
-        category: "groceries",
-        reason: "Restock rice for demo store",
+        english: "Groceries from Mama Ngozi, up to N20,000 a payment",
+        policy: {
+          allowed_categories: ["groceries"],
+          allowed_payees: ["payee_mama_ngozi"],
+          spending_limits: [{ amount_kobo: 2_000_000, interval: "per_payment" }],
+          nod_above_kobo: 1_000_000,
+          nod_rolling_payee_24h_kobo: 1_000_000,
+          expires_at: "2030-01-01T00:00:00.000Z",
+        },
       }),
     });
+    expect(ruleRes.status).toBe(201);
+
+    const currentSig = await signRequest(keys.privateKey, agent.id, { method: "GET", path: "/v1/mandates/current" });
+    const currentRes = await fetch(`${base}/v1/mandates/current`, { headers: { Authorization: `Agent ${currentSig}` } });
+    expect(currentRes.status).toBe(200);
+    expect((await currentRes.json()).version).toBe(1);
+
+    // Payments refuse the old schemes: only a signed agent token passes.
+    const unsigned = await fetch(`${base}/v1/payments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "e2e_unsigned", Authorization: `Owner ${ownerToken}` },
+      body: JSON.stringify({ payee_id: "payee_mama_ngozi", amount_kobo: 100000, category: "groceries", reason: "x" }),
+    });
+    expect(unsigned.status).toBe(401);
+
+    // 4. Signed payment (Authorization: Agent <jwt>)
+    const paymentRes = await signedPayment(keys.privateKey, agent.id, {
+      payee_id: "payee_mama_ngozi",
+      amount_kobo: 850000, // ₦8,500.00
+      category: "groceries",
+      reason: "Restock rice for demo store",
+    }, "e2e_idem_key_001");
     expect(paymentRes.status).toBe(201);
     const paymentData = await paymentRes.json();
     expect(paymentData.payment.status).toBe("settled");
     expect(paymentData.payment.verdict).toBe("allow");
+    expect(paymentData.receipt.policy_version).toBe(1);
     expect(paymentData.receipt.checks).toHaveLength(6);
 
     // 4. Query payment by ID (Receipt drawer)
@@ -136,31 +152,15 @@ describe("Ailo API Engine End-to-End", () => {
     const brakedAgent = brakeData.agent ?? brakeData;
     expect(brakedAgent.status).toBe("revoked");
 
-    // 7. Verify subsequent payment is refused with MANDATE_REVOKED
-    const nonce2 = "test_nonce_e2e_002";
-    const token2 = await new jose.SignJWT({ nonce: nonce2, timestamp: Date.now() })
-      .setProtectedHeader({ alg: "EdDSA", kid: agent.id })
-      .setSubject(agent.id)
-      .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
-
-    const postBrakeRes = await fetch(`${base}/v1/payments`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": "e2e_idem_key_002",
-        Authorization: `Bearer ${token2}`,
-      },
-      body: JSON.stringify({
-        payee_id: "payee_mama_ngozi",
-        amount_kobo: 500000,
-        category: "groceries",
-        reason: "Attempt after revoke",
-      }),
-    });
+    // 7. Verify subsequent payment is refused once the agent is braked
+    const postBrakeRes = await signedPayment(keys.privateKey, agent.id, {
+      payee_id: "payee_mama_ngozi",
+      amount_kobo: 500000,
+      category: "groceries",
+      reason: "Attempt after revoke",
+    }, "e2e_idem_key_002");
     expect(postBrakeRes.status).toBe(403);
     const postBrakeData = await postBrakeRes.json();
-    expect(postBrakeData.error.code).toBe("MANDATE_REVOKED");
+    expect(postBrakeData.error.code).toBe("AGENT_REVOKED");
   });
 });
