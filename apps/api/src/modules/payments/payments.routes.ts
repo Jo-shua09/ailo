@@ -16,14 +16,14 @@ export function paymentsRouter(deps: { ownerAuth: RequestHandler; agentAuth: Req
     }
   });
 
-router.get("/payments/:id", async (req, res, next) => {
-  try {
-    const result = await paymentsService.getPayment(req.params.id as string);
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
+  router.get("/payments/:id", deps.ownerAuth, async (req, res, next) => {
+    try {
+      const result = await paymentsService.getPayment(String(req.params.id));
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // Agent signature runs first, so unauthenticated requests never touch idempotency storage.
   router.post(
