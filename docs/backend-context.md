@@ -168,7 +168,7 @@ All monetary values are **integers in kobo** (`100 kobo = ₦1.00`). Floats are 
 ## 5. Rails & Kora Integration Rules
 
 - **Fixed Reference**: For any payment `pay_xyz`, reference is immutable: `AL-pay_xyz`.
-- **Duplicate Protection**: If Kora returns HTTP 5xx or `"Duplicate Transaction Reference"`, the client **never** creates a new reference. It must re-check the existing reference via `GET /merchant/api/v1/transactions/:reference` (Kora "Verify Payout Transaction", verified in Kora's official collection). `kora.ts` still calls `POST /transactions/query`, which does not exist: fix in progress on main.
+- **Duplicate Protection**: If Kora returns HTTP 5xx or `"Duplicate Transaction Reference"`, the client **never** creates a new reference. It must re-check the existing reference via `GET /merchant/api/v1/transactions/:reference` (Kora "Verify Payout Transaction", verified in Kora's official collection). Fixed on main (`kora.ts`); a payout with no account on file is refused (payee directory: `modules/payees`).
 - **Metadata Restrictions**: Kora allows at most 5 keys with strictly **no underscores** (e.g. `paymentid`, `payeeid`, `rail`).
 - **Simulated Rail**: Used when `KORA_MODE=simulated` or offline, returning `{ is_simulated: true }`.
 

@@ -2,45 +2,19 @@
   "info": {
     "_postman_id": "c1f7a40b-72df-4db2-8bc2-a1b0a1100001",
     "name": "Ailo API Engine",
-    "description": "Complete Postman collection for the Ailo Autonomous Agent Payment Engine. Includes Owner Auth, Ed25519 Agents, Ledger, Payments pipeline, Human Approvals, Kora Webhooks (with auto-HMAC signing), and Ops Reconciliation.",
+    "description": "Ailo API on main. Run in order: 2 (owner session), 3 (register agent), 4 (top up), then payments.\n\nAuth: owner routes need `Authorization: Owner {{owner_token}}` (saved by 'Create Owner Session'). Agent routes need `Authorization: Agent <token>`: an Ed25519 per-request token bound to method, path and exact body, valid 60 s, one use. Postman cannot sign Ed25519, so generate it with the agent kit (see 'Submit Payment').",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "ownerPin",
-      "value": "123456",
-      "type": "string"
-    },
-    {
-      "key": "owner_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "agent_id",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "payment_id",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "approval_id",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "kora_secret_key",
-      "value": "test_secret_key",
-      "type": "string"
-    }
+    { "key": "baseUrl", "value": "http://localhost:4000", "type": "string" },
+    { "key": "ownerPin", "value": "", "type": "string", "description": "Your OWNER_PIN from apps/api/.env (6+ characters). Never commit a real value." },
+    { "key": "owner_token", "value": "", "type": "string" },
+    { "key": "agent_id", "value": "", "type": "string" },
+    { "key": "agent_public_x", "value": "", "type": "string", "description": "The 'x' of the public JWK printed by: cd apps/agent && uv run python -m ailo_agent.keys" },
+    { "key": "agent_token", "value": "", "type": "string", "description": "Paste the full 'Agent ...' header value from ailo_agent.signing" },
+    { "key": "payment_id", "value": "", "type": "string" },
+    { "key": "approval_id", "value": "", "type": "string" },
+    { "key": "kora_secret_key", "value": "", "type": "string", "description": "Same as KORA_SECRET_KEY in apps/api/.env, used only to sign simulated webhooks locally." }
   ],
   "item": [
     {
@@ -48,42 +22,11 @@
       "item": [
         {
           "name": "Health Check",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "health"]
-            },
-            "description": "Returns 200 OK and system uptime."
-          }
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/health", "host": ["{{baseUrl}}"], "path": ["v1", "health"] } }
         },
         {
-          "name": "Root JWKS (Public Keys)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/.well-known/jwks.json",
-              "host": ["{{baseUrl}}"],
-              "path": [".well-known", "jwks.json"]
-            },
-            "description": "Publicly exposed JWKS listing public keys of all active registered agents."
-          }
-        },
-        {
-          "name": "Agents JWKS",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/agents/jwks.json",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "agents", "jwks.json"]
-            },
-            "description": "Alternative JWKS endpoint under the /v1/agents prefix."
-          }
+          "name": "JWKS (active agents' public keys)",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/.well-known/jwks.json", "host": ["{{baseUrl}}"], "path": [".well-known", "jwks.json"] } }
         }
       ]
     },
@@ -92,496 +35,181 @@
       "item": [
         {
           "name": "Create Owner Session",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var json = pm.response.json();",
-                  "    if (json.token) {",
-                  "        pm.collectionVariables.set('owner_token', json.token);",
-                  "        console.log('Saved owner_token:', json.token);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 200) pm.collectionVariables.set('owner_token', pm.response.json().token);"
+          ] } }],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"pin\": \"{{ownerPin}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/owner/session",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "owner", "session"]
-            },
-            "description": "Authenticates the owner using OWNER_PIN and returns a signed session JWT. The token is automatically saved to the collection variable `owner_token`."
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"pin\": \"{{ownerPin}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/owner/session", "host": ["{{baseUrl}}"], "path": ["v1", "owner", "session"] },
+            "description": "Swaps OWNER_PIN for a 12 h owner token (saved to owner_token). 5 wrong PINs from one IP lock that IP out for 15 minutes."
           }
         }
       ]
     },
     {
-      "name": "3. Agents & Mandates",
+      "name": "3. Agents (Badge + Brake)",
       "item": [
         {
-          "name": "Register Agent (Badge)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 201 || pm.response.code === 200) {",
-                  "    var json = pm.response.json();",
-                  "    var id = json.id || (json.agent && json.agent.id);",
-                  "    if (id) {",
-                  "        pm.collectionVariables.set('agent_id', id);",
-                  "        console.log('Saved agent_id:', id);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "name": "Register Agent",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 201) pm.collectionVariables.set('agent_id', pm.response.json().id);"
+          ] } }],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Procurement Bot\",\n  \"public_key_jwk\": {\n    \"kty\": \"OKP\",\n    \"crv\": \"Ed25519\",\n    \"x\": \"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"\n  },\n  \"permissions\": [\"payments:create\"],\n  \"rules\": {\n    \"max_amount_kobo\": 10000000,\n    \"allowed_categories\": [\"logistics\", \"supplies\"]\n  }\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/agents",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "agents"]
-            },
-            "description": "Registers a new autonomous agent with its Ed25519 public JWK and policy rules. Automatically stores `agent_id`."
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Shop agent\",\n  \"public_jwk\": { \"kty\": \"OKP\", \"crv\": \"Ed25519\", \"x\": \"{{agent_public_x}}\" }\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/agents", "host": ["{{baseUrl}}"], "path": ["v1", "agents"] },
+            "description": "The agent makes its own keypair (`cd apps/agent && uv run python -m ailo_agent.keys`) and only the PUBLIC key is registered. The server never sees a private key; a JWK containing `d` is rejected."
           }
         },
         {
           "name": "List Agents",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/agents", "host": ["{{baseUrl}}"], "path": ["v1", "agents"] } }
+        },
+        {
+          "name": "Agent: who am I (signed)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/agents",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "agents"]
-            },
-            "description": "Retrieves the list of all registered agents."
+            "header": [{ "key": "Authorization", "value": "{{agent_token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/agents/me", "host": ["{{baseUrl}}"], "path": ["v1", "agents", "me"] },
+            "description": "Generate the token: cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} GET /v1/agents/me"
           }
         },
         {
-          "name": "Get Agent by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/agents/{{agent_id}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "agents", "{{agent_id}}"]
-            },
-            "description": "Retrieves public details and status of a specific agent."
-          }
-        },
-        {
-          "name": "Pull Brake (Kill Switch)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/agents/{{agent_id}}/brake",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "agents", "{{agent_id}}", "brake"]
-            },
-            "description": "Instantly revokes the agent's signing authority. All subsequent payment requests signed by this agent will be rejected."
-          }
+          "name": "Pull Brake (kill switch)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/agents/{{agent_id}}/brake", "host": ["{{baseUrl}}"], "path": ["v1", "agents", "{{agent_id}}", "brake"] } }
         }
       ]
     },
     {
-      "name": "4. Ledger (Double-Entry Book)",
+      "name": "4. Ledger",
       "item": [
         {
-          "name": "Top Up Owner Wallet",
+          "name": "Top Up Owner Wallet (mirror ledger)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount_kobo\": 10000000,\n  \"description\": \"Initial operating treasury top-up (100,000 NGN)\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/ledger/topup",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "ledger", "topup"]
-            },
-            "description": "Credits the merchant/owner wallet via double-entry posting from system treasury in integer kobo."
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount_kobo\": 5000000,\n  \"description\": \"Demo top-up (50,000 NGN, sandbox)\"\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/ledger/topup", "host": ["{{baseUrl}}"], "path": ["v1", "ledger", "topup"] }
           }
         },
         {
-          "name": "Get Ledger Balances",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/ledger/balances",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "ledger", "balances"]
-            },
-            "description": "Returns current posted, pending hold, and available balances across accounts."
-          }
+          "name": "Get Balances",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/ledger/balances", "host": ["{{baseUrl}}"], "path": ["v1", "ledger", "balances"] } }
         }
       ]
     },
     {
-      "name": "5. Payments & Checks Pipeline",
+      "name": "5. Payments",
       "item": [
         {
-          "name": "Submit Payment Request",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "pm.variables.set('idempotencyKey', 'idemp_' + Date.now());"
-                ],
-                "type": "text/javascript"
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 201 || pm.response.code === 200) {",
-                  "    var json = pm.response.json();",
-                  "    var id = (json.payment && json.payment.id) || json.id;",
-                  "    if (id) {",
-                  "        pm.collectionVariables.set('payment_id', id);",
-                  "        console.log('Saved payment_id:', id);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "name": "Submit Payment (agent-signed)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "var j = pm.response.json(); if (j.payment) pm.collectionVariables.set('payment_id', j.payment.id);"
+          ] } }],
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "{{idempotencyKey}}"
-              }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "Authorization", "value": "{{agent_token}}" }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount_kobo\": 250000,\n  \"currency\": \"NGN\",\n  \"payee_id\": \"payee_supplier_98\",\n  \"payee_name\": \"Lagos Logistics Ltd\",\n  \"destination_bank_code\": \"044\",\n  \"destination_account_number\": \"0690000031\",\n  \"narration\": \"Dispatch fee payment\",\n  \"rules_context\": {\n    \"category\": \"logistics\",\n    \"department\": \"ops\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/payments",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "payments"]
-            },
-            "description": "Processes payment through the complete 6-step Check pipeline: Signature Verification -> Rules Engine -> Ledger Reserve -> Second Look -> Human Nod (if flagged) -> Payout Rail."
+            "body": { "mode": "raw", "raw": "{\"payee_id\":\"payee_mama_ngozi\",\"amount_kobo\":850000,\"category\":\"groceries\",\"reason\":\"Restock rice for the shop\"}" },
+            "url": { "raw": "{{baseUrl}}/v1/payments", "host": ["{{baseUrl}}"], "path": ["v1", "payments"] },
+            "description": "The signature covers the exact body bytes. 1) Save this body (one line, no changes) to apps/agent/body.json. 2) cd apps/agent && uv run python -m ailo_agent.signing {{agent_id}} POST /v1/payments body.json 3) Paste the printed 'Agent ...' into agent_token and send within 60 s. Each token works once. Bank details come from the server's payee directory (payee_mama_ngozi, payee_lagos_logistics), never from this body."
           }
         },
         {
           "name": "List Payments",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/payments",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "payments"]
-            },
-            "description": "Lists all payments with statuses, receipts, and checks."
-          }
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/payments", "host": ["{{baseUrl}}"], "path": ["v1", "payments"] } }
         },
         {
-          "name": "Get Payment by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/payments/{{payment_id}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "payments", "{{payment_id}}"]
-            },
-            "description": "Retrieves the full payment record including audit trail of pipeline checks and settlement receipt."
-          }
+          "name": "Get Payment + Receipt",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/payments/{{payment_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "payments", "{{payment_id}}"] } }
         }
       ]
     },
     {
-      "name": "6. Approvals (Human-in-the-Loop)",
+      "name": "6. Approvals (Nod)",
       "item": [
         {
           "name": "List Pending Approvals",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    var json = pm.response.json();",
-                  "    var approvals = json.approvals || json;",
-                  "    if (approvals && approvals.length > 0) {",
-                  "        pm.collectionVariables.set('approval_id', approvals[0].id);",
-                  "        console.log('Saved approval_id:', approvals[0].id);",
-                  "    }",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/approvals",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "approvals"]
-            },
-            "description": "Lists payments parked in `pending_approval` state requiring human authorization."
-          }
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "var a = pm.response.json().approvals || []; if (a.length) pm.collectionVariables.set('approval_id', a[0].id);"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/approvals", "host": ["{{baseUrl}}"], "path": ["v1", "approvals"] } }
         },
         {
-          "name": "Get Approval by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "approvals", "{{approval_id}}"]
-            },
-            "description": "Retrieves details of a specific parked approval request."
-          }
-        },
-        {
-          "name": "Decide Approval (Approve)",
+          "name": "Approve",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"decision\": \"approve\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "approvals", "{{approval_id}}"]
-            },
-            "description": "Owner approves the parked payment. Triggers immediate disbursement through the payout rail."
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"approve\"\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "approvals", "{{approval_id}}"] }
           }
         },
         {
-          "name": "Decide Approval (Deny)",
+          "name": "Deny",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"decision\": \"deny\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "approvals", "{{approval_id}}"]
-            },
-            "description": "Owner denies the parked payment. Releases the ledger hold and marks payment failed."
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Owner {{owner_token}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"deny\"\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/approvals/{{approval_id}}", "host": ["{{baseUrl}}"], "path": ["v1", "approvals", "{{approval_id}}"] }
           }
         }
       ]
     },
     {
-      "name": "7. Webhooks (Kora Rail Integration)",
+      "name": "7. Kora Webhooks (simulated locally)",
       "item": [
         {
-          "name": "Kora Webhook - Transfer Success",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "var secret = pm.collectionVariables.get('kora_secret_key') || 'test_secret_key';",
-                  "var rawBody = pm.request.body.raw;",
-                  "var hmac = CryptoJS.HmacSHA256(rawBody, secret).toString(CryptoJS.enc.Hex);",
-                  "pm.request.headers.upsert({ key: 'x-korapay-signature', value: hmac });",
-                  "console.log('Generated x-korapay-signature:', hmac);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "name": "Webhook - transfer.success",
+          "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+            "// Kora signs HMAC-SHA256 of JSON.stringify(body.data) with the secret key (Kora webhook docs), not the whole body.",
+            "var data = JSON.parse(pm.request.body.raw).data;",
+            "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
+            "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
+          ] } }],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-korapay-signature",
-                "value": "computed_automatically_in_prerequest_script"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"event\": \"transfer.success\",\n  \"data\": {\n    \"reference\": \"AL-pay_demo_test_001\",\n    \"status\": \"success\",\n    \"amount\": 2500,\n    \"fee\": 15,\n    \"currency\": \"NGN\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/webhooks/kora",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "webhooks", "kora"]
-            },
-            "description": "Simulates an incoming transfer.success webhook from Korapay. The Pre-request Script automatically calculates the HMAC-SHA256 signature using `kora_secret_key`."
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"transfer.success\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"success\", \"amount\": \"8500.00\", \"fee\": 10, \"currency\": \"NGN\" }\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/webhooks/kora", "host": ["{{baseUrl}}"], "path": ["v1", "webhooks", "kora"] },
+            "description": "Real Kora webhooks need a public URL (ngrok). The server treats a webhook as a hint and re-checks the payout with Kora (GET /transactions/:reference)."
           }
         },
         {
-          "name": "Kora Webhook - Transfer Failed",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "var secret = pm.collectionVariables.get('kora_secret_key') || 'test_secret_key';",
-                  "var rawBody = pm.request.body.raw;",
-                  "var hmac = CryptoJS.HmacSHA256(rawBody, secret).toString(CryptoJS.enc.Hex);",
-                  "pm.request.headers.upsert({ key: 'x-korapay-signature', value: hmac });",
-                  "console.log('Generated x-korapay-signature:', hmac);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
+          "name": "Webhook - transfer.failed",
+          "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+            "var data = JSON.parse(pm.request.body.raw).data;",
+            "var sig = CryptoJS.HmacSHA256(JSON.stringify(data), pm.collectionVariables.get('kora_secret_key')).toString(CryptoJS.enc.Hex);",
+            "pm.request.headers.upsert({ key: 'x-korapay-signature', value: sig });"
+          ] } }],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-korapay-signature",
-                "value": "computed_automatically_in_prerequest_script"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"event\": \"transfer.failed\",\n  \"data\": {\n    \"reference\": \"AL-pay_demo_test_002\",\n    \"status\": \"failed\",\n    \"amount\": 1500,\n    \"fee\": 0,\n    \"currency\": \"NGN\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/webhooks/kora",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "webhooks", "kora"]
-            },
-            "description": "Simulates an incoming transfer.failed webhook from Korapay."
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"event\": \"transfer.failed\",\n  \"data\": { \"reference\": \"AL-{{payment_id}}\", \"status\": \"failed\", \"amount\": \"8500.00\", \"fee\": 0, \"currency\": \"NGN\" }\n}" },
+            "url": { "raw": "{{baseUrl}}/v1/webhooks/kora", "host": ["{{baseUrl}}"], "path": ["v1", "webhooks", "kora"] }
           }
         }
       ]
     },
     {
-      "name": "8. Ops & Real-Time Events",
+      "name": "8. Ops & Live Events",
       "item": [
         {
-          "name": "Square Up (Ops Reconciliation)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Owner {{owner_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fix\": false\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/v1/ops/reconcile",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "ops", "reconcile"]
-            },
-            "description": "Scans internal pending payments against external rail records to detect and report breaks or discrepancies."
-          }
+          "name": "Square Up (reconcile with Kora)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Owner {{owner_token}}" }], "url": { "raw": "{{baseUrl}}/v1/ops/reconcile", "host": ["{{baseUrl}}"], "path": ["v1", "ops", "reconcile"] } }
         },
         {
-          "name": "Real-Time Events Stream (SSE)",
+          "name": "Live Events (SSE)",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "text/event-stream"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/v1/events",
-              "host": ["{{baseUrl}}"],
-              "path": ["v1", "events"]
-            },
-            "description": "Server-Sent Events (SSE) stream for live updates on payment state transitions, approvals, and webhook reconciliations."
+            "header": [{ "key": "Accept", "value": "text/event-stream" }],
+            "url": { "raw": "{{baseUrl}}/v1/events?access_token={{owner_token}}", "host": ["{{baseUrl}}"], "path": ["v1", "events"], "query": [{ "key": "access_token", "value": "{{owner_token}}" }] },
+            "description": "Browsers cannot send headers on EventSource, so the owner token goes in ?access_token= (RFC 6750 section 2.3)."
           }
         }
       ]
