@@ -46,6 +46,7 @@ export class KoraRail implements PayoutRail {
         },
         customer: {
           name: params.payee_name,
+          email: params.payee_email ?? `${params.payee_id.replace(/[^a-zA-Z0-9]/g, "") || "payee"}@ailo.internal`,
         },
       },
       metadata,

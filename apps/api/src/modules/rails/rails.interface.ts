@@ -4,6 +4,7 @@ export interface PayoutParams {
   amount_kobo: number;
   payee_id: string;
   payee_name: string;
+  payee_email?: string;
   destination_bank_code?: string;
   destination_account_number?: string;
   narration?: string;
