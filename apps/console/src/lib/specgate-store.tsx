@@ -64,6 +64,9 @@ type Store = {
   payments: Payment[];
   approvals: { id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[];
   balance: number;
+  loading: boolean;
+  loadError: string | null;
+  reload: () => Promise<void>;
   ledger: LedgerEntry[];
   agents: Agent[];
   addAgent: (agent: Agent) => void;
@@ -102,11 +105,15 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [approvals, setApprovals] = useState<{ id: string; payment_id: string; amount_kobo: number; payee_name: string; status: string; created_at: string }[]>([]);
   const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
 
   const reload = useCallback(async () => {
     if (!getToken() || loadingRef.current) return;
     loadingRef.current = true;
+    setLoading(true);
+    setLoadError(null);
     try {
       const [paymentData, approvalData, agentData, balanceData] = await Promise.all([
         ownerFetch<{ payments: Record<string, unknown>[] }>("/v1/payments"),
@@ -131,7 +138,12 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       })));
       setBalance(Number(balanceData.available_balance_kobo || 0));
       setLedger([]);
-    } finally { loadingRef.current = false; }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load account data.");
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -253,6 +265,9 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       payments,
       approvals,
       balance,
+      loading,
+      loadError,
+      reload,
       ledger,
       agents,
       addAgent,
@@ -282,6 +297,9 @@ export function SpecGateProvider({ children }: { children: ReactNode }) {
       payments,
       approvals,
       balance,
+      loading,
+      loadError,
+      reload,
       ledger,
       agents,
       addAgent,

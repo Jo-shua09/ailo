@@ -4,7 +4,13 @@ export const API = "http://localhost:4000";
 const TOKEN_KEY = "ailo_owner_token";
 
 export function getToken() {
-  return typeof window === "undefined" ? null : window.localStorage.getItem(TOKEN_KEY);
+  if (typeof window === "undefined") return null;
+  const token = window.localStorage.getItem(TOKEN_KEY);
+  if (token === "local-demo-session") {
+    window.localStorage.removeItem(TOKEN_KEY);
+    return null;
+  }
+  return token;
 }
 
 export async function signIn(pin: string): Promise<string> {

@@ -10,6 +10,7 @@ export function useAiloLive() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [balances, setBalances] = useState<LedgerBalances | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const login = async (pin: string) => {
     try {
@@ -23,6 +24,8 @@ export function useAiloLive() {
   };
 
   const fetchInitialData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const [fetchedPayments, fetchedApprovals, fetchedBalances] = await Promise.all([
         ailoApi.getPayments(),
@@ -34,6 +37,8 @@ export function useAiloLive() {
       setBalances(fetchedBalances);
     } catch (err: any) {
       setError("Failed to load initial data");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -93,6 +98,7 @@ export function useAiloLive() {
     approvals,
     balances,
     error,
+    isLoading,
     api: ailoApi, // Expose API for manual actions like ailoApi.decideApproval()
   };
 }

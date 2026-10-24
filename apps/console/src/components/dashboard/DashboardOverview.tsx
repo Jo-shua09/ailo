@@ -20,6 +20,7 @@ import { useSpecGate, type Agent } from "@/src/lib/specgate-store";
 import { naira } from "@/src/lib/format";
 import { CreateAgentDialog } from "./CreateAgentDialog";
 import { AgentDetailModal } from "./AgentDetailModal";
+import { DataStatus } from "./DataStatus";
 
 export function DashboardOverview() {
   const {
@@ -28,6 +29,9 @@ export function DashboardOverview() {
     revoked,
     revoke,
     agents,
+    loading,
+    loadError,
+    reload,
   } = useSpecGate();
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -99,6 +103,8 @@ export function DashboardOverview() {
           </Link>
         </div>
       </div>
+
+      <DataStatus loading={loading} error={loadError} onRetry={() => void reload()} />
 
       {/* Metric Cards Grid (3 cards in 1 row) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
