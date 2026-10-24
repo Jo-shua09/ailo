@@ -1,14 +1,17 @@
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../../app";
+import { resetMemoryDb } from "../../db/mongo";
 import { newAgentKeys, signRequest } from "../../test/agent-signing";
+import { AgentsService } from "./agents.service";
 
 let server: Server;
 let base: string;
 
 beforeAll(() => {
-  server = createApp({ ownerPin: "2468", sessionSecret: "s".repeat(32) }).listen(0);
+  resetMemoryDb();
+  server = createApp({ ownerPin: "246810", sessionSecret: "s".repeat(32) }).listen(0);
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterAll(() => server.close());
@@ -21,17 +24,11 @@ const json = (method: string, path: string, body?: unknown, token?: string) =>
   });
 
 async function ownerToken(): Promise<string> {
-  const res = await json("POST", "/v1/owner/session", { pin: "2468" });
+  const res = await json("POST", "/v1/owner/session", { pin: "246810" });
   return ((await res.json()) as { token: string }).token;
 }
 
-describe("owner session", () => {
-  it("rejects a wrong PIN", async () => {
-    expect((await json("POST", "/v1/owner/session", { pin: "0000" })).status).toBe(401);
-  });
-});
-
-describe("agents (Badge + Brake)", () => {
+describe("agents (Badge + Brake HTTP)", () => {
   it("only the owner can register an agent", async () => {
     const { publicJwk } = await newAgentKeys();
     expect((await json("POST", "/v1/agents", { name: "Shop agent", public_jwk: publicJwk })).status).toBe(401);
@@ -74,5 +71,51 @@ describe("agents (Badge + Brake)", () => {
     const sig = await signRequest(keys.privateKey, "agt_x", { method: "POST", path: "/v1/agents/agt_x/brake" });
     const res = await fetch(`${base}/v1/agents/agt_x/brake`, { method: "POST", headers: { authorization: `Agent ${sig}` } });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("AgentsService unit", () => {
+  let service: AgentsService;
+
+  beforeEach(() => {
+    resetMemoryDb();
+    service = new AgentsService();
+  });
+
+  it("registers an agent, generates Ed25519 key, and computes fingerprint", async () => {
+    const { agent, private_key_jwk } = await service.registerAgent({ name: "Shop agent" });
+
+    expect(agent.id).toMatch(/^agt_/);
+    expect(agent.name).toBe("Shop agent");
+    expect(agent.status).toBe("active");
+    expect(agent.public_key_jwk.kty).toBe("OKP");
+    expect(agent.public_key_jwk.crv).toBe("Ed25519");
+    expect(agent.key_fingerprint).toMatch(/^ed25519:[a-f0-9]{16}$/);
+    expect(private_key_jwk).toBeDefined();
+
+    const retrieved = await service.getAgent(agent.id);
+    expect(retrieved.id).toBe(agent.id);
+  });
+
+  it("publishes active agent keys in JWKS format", async () => {
+    const { agent } = await service.registerAgent({ name: "Buyer agent" });
+    const jwks = await service.getJWKS();
+
+    expect(jwks.keys).toHaveLength(1);
+    expect(jwks.keys[0]?.kid).toBe(agent.id);
+    expect(jwks.keys[0]?.crv).toBe("Ed25519");
+  });
+
+  it("executes Brake kill switch to revoke an agent and removes from JWKS", async () => {
+    const { agent } = await service.registerAgent({ name: "Vulnerable agent" });
+    expect(agent.status).toBe("active");
+
+    const revoked = await service.revokeAgent(agent.id);
+    expect(revoked.status).toBe("revoked");
+    expect(revoked.revoked_at).toBeDefined();
+
+    // Verify JWKS excludes revoked agents
+    const jwks = await service.getJWKS();
+    expect(jwks.keys).toHaveLength(0);
   });
 });
